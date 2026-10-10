@@ -650,6 +650,47 @@
 	return NO;
 }
 
+-(FlycutStore *) storeForFavorites:(BOOL)favorites
+{
+	return favorites ? favoritesStore : [self primaryStore];
+}
+
+-(NSArray *) clippingsInFavorites:(BOOL)favorites
+{
+	return [[self storeForFavorites:favorites] allClippings];
+}
+
+-(NSString *) pasteContentsOfClipping:(FlycutClipping *)clipping inFavorites:(BOOL)favorites
+{
+	FlycutStore *store = [self storeForFavorites:favorites];
+	int index = [store indexOfClippingIdenticalTo:clipping];
+	if ( index < 0 )
+		return nil;
+
+	NSString *contents = [[[clipping contents] retain] autorelease];
+	if ( [[NSUserDefaults standardUserDefaults] boolForKey:@"pasteMovesToTop"] ) {
+		[store clippingMoveToTop:index];
+		if ( store == clippingStore )
+			stackPosition = 0;
+		[self actionAfterListModification];
+	}
+	return contents;
+}
+
+-(void) deleteClipping:(FlycutClipping *)clipping inFavorites:(BOOL)favorites
+{
+	FlycutStore *store = [self storeForFavorites:favorites];
+	int index = [store indexOfClippingIdenticalTo:clipping];
+	if ( index < 0 )
+		return;
+
+	inhibitAutosaveClippings = YES; // Avoid saving things that the user explicitly deletes.
+	[store clearItem:index];
+	inhibitAutosaveClippings = NO;
+	[self adjustStackPositionIfOutOfBounds];
+	[self actionAfterListModification];
+}
+
 -(void)setDisableStoreTo:(bool) value
 {
     disableStore = value;

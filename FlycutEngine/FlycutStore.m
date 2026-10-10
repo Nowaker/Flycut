@@ -61,6 +61,11 @@
 	return result;
 }
 
+-(int) indexOfClippingIdenticalTo:(FlycutClipping*) clipping{
+	NSUInteger index = [jcList indexOfObjectIdenticalTo:clipping];
+	return NSNotFound == index ? -1 : (int)index;
+}
+
 -(int) indexOfClipping:(FlycutClipping*) clipping{
 	return [self indexOfClipping:clipping afterIndex:-1];
 }

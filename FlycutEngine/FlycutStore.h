@@ -97,6 +97,7 @@ typedef NS_ENUM(int, FlycutHistoryList) {
 -(NSArray *) previousIndexes:(int)howMany containing:(NSString*)search; // This method is in newest-first order.
 -(NSArray *) allClippings;
 -(int) indexOfClipping:(FlycutClipping*) clipping;
+-(int) indexOfClippingIdenticalTo:(FlycutClipping*) clipping;
 -(int) indexOfClipping:(NSString *)clipping ofType:(NSString *)type fromAppLocalizedName:(NSString *)appLocalizedName fromAppBundleURL:(NSString *)bundleURL atTimestamp:(int) timestamp;
 -(bool) removeDuplicates;
 

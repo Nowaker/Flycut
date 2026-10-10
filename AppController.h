@@ -15,6 +15,7 @@
 #import <Cocoa/Cocoa.h>
 #import <ApplicationServices/ApplicationServices.h>
 #import "BezelWindow.h"
+#import "HistoryPanel.h"
 #import "SRRecorderControl.h"
 #import "SRKeyCodeTransformer.h"
 #import "FlycutOperator.h"
@@ -22,10 +23,13 @@
 
 @class SGHotKey;
 
-@interface AppController : NSObject <NSMenuDelegate, NSApplicationDelegate, FlycutStoreDelegate, FlycutOperatorDelegate, BezelWindowDelegate> {
+@interface AppController : NSObject <NSMenuDelegate, NSApplicationDelegate, FlycutStoreDelegate, FlycutOperatorDelegate, BezelWindowDelegate, HistoryPanelDelegate> {
     BezelWindow					*bezel;
+	HistoryPanel				*historyPanel;
 	SGHotKey					*mainHotKey;
+	SGHotKey					*secondHotKey;
 	IBOutlet SRRecorderControl	*mainRecorder;
+	IBOutlet SRRecorderControl	*secondRecorder;
 	IBOutlet NSPanel			*prefsPanel;
 	IBOutlet NSTextView			*acknowledgementsView;
 	IBOutlet NSBox			  *appearancePanel;
@@ -94,6 +98,7 @@
 
 // Hotkey related
 -(void)hitMainHotKey:(SGHotKey *)hotKey;
+-(void)hitSecondHotKey:(SGHotKey *)hotKey;
 
 // Bezel related
 -(void) updateBezel;
@@ -121,6 +126,7 @@
 -(IBAction) switchMenuIcon:(id)sender;
 -(IBAction) toggleLoadOnStartup:(id)sender;
 -(IBAction) toggleMainHotKey:(id)sender;
+-(void) toggleSecondHotKey;
 -(IBAction) toggleICloudSyncSettings:(id)sender;
 -(IBAction) toggleICloudSyncClippings:(id)sender;
 -(IBAction) setSavePreference:(id)sender;

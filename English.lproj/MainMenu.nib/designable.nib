@@ -105,6 +105,7 @@
                 <outlet property="mainRecorder" destination="555" id="556"/>
                 <outlet property="prefsPanel" destination="218" id="220"/>
                 <outlet property="saveFromBezelToLabel" destination="GRg-nv-Opa" id="hLw-Hb-VQg"/>
+                <outlet property="secondRecorder" destination="Hpw-sr-001" id="Hpw-so-001"/>
                 <outlet property="saveToLocationButton" destination="Bqn-So-8E9" id="vh2-7q-lE5"/>
                 <outlet property="savingSectionLabel" destination="g6p-DW-uAA" id="4n5-RC-Ijw"/>
                 <outlet property="searchBox" destination="BYk-Gn-IDB" id="MpX-C1-cdn"/>
@@ -730,14 +731,14 @@
                                     <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                     <subviews>
                                         <box fixedFrame="YES" boxType="oldStyle" borderType="none" title="Box" titlePosition="noTitle" translatesAutoresizingMaskIntoConstraints="NO" id="348">
-                                            <rect key="frame" x="0.0" y="227" width="555" height="125"/>
+                                            <rect key="frame" x="0.0" y="117" width="555" height="235"/>
                                             <autoresizingMask key="autoresizingMask"/>
                                             <view key="contentView" id="Kdy-dK-U26">
-                                                <rect key="frame" x="0.0" y="0.0" width="555" height="125"/>
+                                                <rect key="frame" x="0.0" y="0.0" width="555" height="235"/>
                                                 <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                                 <subviews>
                                                     <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="350">
-                                                        <rect key="frame" x="16" y="87" width="65" height="18"/>
+                                                        <rect key="frame" x="16" y="197" width="65" height="18"/>
                                                         <autoresizingMask key="autoresizingMask"/>
                                                         <textFieldCell key="cell" sendsActionOnEndEditing="YES" id="747">
                                                             <font key="font" metaFont="system" size="10"/>
@@ -748,7 +749,7 @@
                                                         </textFieldCell>
                                                     </textField>
                                                     <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="497">
-                                                        <rect key="frame" x="247" y="48" width="255" height="61"/>
+                                                        <rect key="frame" x="247" y="158" width="255" height="61"/>
                                                         <autoresizingMask key="autoresizingMask"/>
                                                         <textFieldCell key="cell" sendsActionOnEndEditing="YES" id="748">
                                                             <font key="font" metaFont="system" size="10"/>
@@ -758,12 +759,63 @@
                                                         </textFieldCell>
                                                     </textField>
                                                     <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="555" customClass="SRRecorderControl">
-                                                        <rect key="frame" x="89" y="87" width="150" height="22"/>
+                                                        <rect key="frame" x="89" y="197" width="150" height="22"/>
                                                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                                                         <connections>
                                                             <outlet property="delegate" destination="213" id="591"/>
                                                         </connections>
                                                     </customView>
+                                                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hpw-l1-001">
+                                                        <rect key="frame" x="16" y="100" width="140" height="18"/>
+                                                        <autoresizingMask key="autoresizingMask"/>
+                                                        <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="Main hotkey opens" id="Hpw-l1-002">
+                                                            <font key="font" metaFont="system" size="10"/>
+                                                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                                                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                                                        </textFieldCell>
+                                                    </textField>
+                                                    <popUpButton verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hpw-pu-001">
+                                                        <rect key="frame" x="160" y="94" width="180" height="25"/>
+                                                        <autoresizingMask key="autoresizingMask"/>
+                                                        <popUpButtonCell key="cell" type="push" title="History window" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" state="on" borderStyle="borderAndBezel" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" selectedItem="Hpw-mi-001" id="Hpw-pc-001">
+                                                            <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                                                            <font key="font" metaFont="menu"/>
+                                                            <menu key="menu" title="OtherViews" id="Hpw-mn-001">
+                                                                <items>
+                                                                    <menuItem title="History window" state="on" id="Hpw-mi-001"/>
+                                                                    <menuItem title="Bezel" id="Hpw-mi-002"/>
+                                                                </items>
+                                                            </menu>
+                                                        </popUpButtonCell>
+                                                        <connections>
+                                                            <binding destination="808" name="selectedIndex" keyPath="values.mainHotkeyPopup" id="Hpw-pb-001"/>
+                                                        </connections>
+                                                    </popUpButton>
+                                                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hpw-l2-001">
+                                                        <rect key="frame" x="16" y="62" width="140" height="18"/>
+                                                        <autoresizingMask key="autoresizingMask"/>
+                                                        <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="Second hotkey" id="Hpw-l2-002">
+                                                            <font key="font" metaFont="system" size="10"/>
+                                                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                                                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                                                        </textFieldCell>
+                                                    </textField>
+                                                    <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hpw-sr-001" customClass="SRRecorderControl">
+                                                        <rect key="frame" x="160" y="60" width="150" height="22"/>
+                                                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                                                        <connections>
+                                                            <outlet property="delegate" destination="213" id="Hpw-sd-001"/>
+                                                        </connections>
+                                                    </customView>
+                                                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hpw-l3-001">
+                                                        <rect key="frame" x="16" y="14" width="480" height="40"/>
+                                                        <autoresizingMask key="autoresizingMask"/>
+                                                        <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="The second hotkey opens whichever popup the main hotkey doesn't. Leave it empty to turn it off." id="Hpw-l3-002">
+                                                            <font key="font" metaFont="system" size="11"/>
+                                                            <color key="textColor" name="secondaryLabelColor" catalog="System" colorSpace="catalog"/>
+                                                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                                                        </textFieldCell>
+                                                    </textField>
                                                 </subviews>
                                             </view>
                                         </box>

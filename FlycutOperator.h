@@ -107,6 +107,9 @@
 -(FlycutClipping*)clippingAtStackPosition;
 -(NSArray *) previousDisplayStrings:(int)howMany containing:(NSString*)search;
 -(NSArray *) previousIndexes:(int)howMany containing:(NSString*)search; // This method is in newest-first order.
+-(NSArray *) clippingsInFavorites:(BOOL)favorites;
+-(NSString *) pasteContentsOfClipping:(FlycutClipping *)clipping inFavorites:(BOOL)favorites;
+-(void) deleteClipping:(FlycutClipping *)clipping inFavorites:(BOOL)favorites;
 -(void)setDisableStoreTo:(bool) value;
 -(bool)storeDisabled;
 -(void)setClippingsStoreDelegate:(id<FlycutStoreDelegate>) delegate;

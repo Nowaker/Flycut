@@ -76,6 +76,8 @@
         @"saveForgottenFavorites",
         [NSNumber numberWithBool:NO],
         @"suppressAccessibilityAlert",
+        [NSNumber numberWithInt:0],
+        @"mainHotkeyPopup",
         nil]];
 
 	/* For testing, the ability to force initial values of the sync settings:
@@ -99,6 +101,7 @@
 						 @"saveForgottenClippings",
 						 @"saveForgottenFavorites",
                          @"suppressAccessibilityAlert",
+                         @"mainHotkeyPopup",
                         ];
 	[settingsSyncList retain];
 
@@ -187,6 +190,11 @@
 												 [[[[NSUserDefaults standardUserDefaults] dictionaryForKey:@"ShortcutRecorder mainHotkey"] objectForKey:@"modifierFlags"] intValue] )
 		];
 	};
+	NSDictionary *secondHotkey = [[NSUserDefaults standardUserDefaults] dictionaryForKey:@"ShortcutRecorder secondHotkey"];
+	if ( secondHotkey ) {
+		[secondRecorder setKeyCombo:SRMakeKeyCombo([[secondHotkey objectForKey:@"keyCode"] intValue],
+												   [[secondHotkey objectForKey:@"modifierFlags"] intValue])];
+	}
 
     [bezel setColor:NO];
     
@@ -1073,6 +1081,7 @@
 
 	//Create our hot key
 	[self toggleMainHotKey:[NSNull null]];
+	[self toggleSecondHotKey];
 }
 
 // Remote Notifications (APN, aka Push Notifications) are only available on apps distributed via the App Store.
@@ -1149,8 +1158,55 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 }
 
 
+// The main hotkey opens the history window unless the user picked the bezel; the second hotkey opens the other one.
+-(BOOL) mainHotkeyOpensBezel
+{
+	return [[NSUserDefaults standardUserDefaults] integerForKey:@"mainHotkeyPopup"] == 1;
+}
+
 - (void)hitMainHotKey:(SGHotKey *)hotKey
 {
+	if ( [self mainHotkeyOpensBezel] )
+		[self showOrAdvanceBezel];
+	else
+		[self showOrAdvanceHistoryPanel];
+}
+
+- (void)hitSecondHotKey:(SGHotKey *)hotKey
+{
+	if ( [self mainHotkeyOpensBezel] )
+		[self showOrAdvanceHistoryPanel];
+	else
+		[self showOrAdvanceBezel];
+}
+
+-(HistoryPanel *) historyPanel
+{
+	if ( nil == historyPanel )
+		historyPanel = [[HistoryPanel alloc] initWithHistoryDelegate:self];
+	return historyPanel;
+}
+
+-(void) showOrAdvanceHistoryPanel
+{
+	if ( isBezelDisplayed ) {
+		isBezelPinned = NO;
+		[self hideBezel];
+	}
+	if ( [[self historyPanel] isVisible] ) {
+		if ( [NSEvent modifierFlags] & NSEventModifierFlagShift )
+			[historyPanel selectPrevious];
+		else
+			[historyPanel selectNext];
+	} else {
+		[self restoreStashedStoreAndUpdate];
+		[historyPanel showOnActiveScreen];
+	}
+}
+
+-(void) showOrAdvanceBezel
+{
+	[historyPanel dismiss];
 	if ( ! isBezelDisplayed ) {
 		//Do NOT activate the app so focus stays on app the user is interacting with
 		//https://github.com/TermiT/Flycut/issues/45
@@ -1162,6 +1218,25 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 	} else {
 		[self stackDown];
 	}
+}
+
+- (void)toggleSecondHotKey
+{
+	if ( secondHotKey != nil ) {
+		[[SGHotKeyCenter sharedCenter] unregisterHotKey:secondHotKey];
+		[secondHotKey release];
+		secondHotKey = nil;
+	}
+	KeyCombo combo = [secondRecorder keyCombo];
+	if ( combo.code == ShortcutRecorderEmptyCode )
+		return;
+	secondHotKey = [[SGHotKey alloc] initWithIdentifier:@"secondHotKey"
+											   keyCombo:[SGKeyCombo keyComboWithKeyCode:combo.code
+																			  modifiers:[secondRecorder cocoaToCarbonFlags:combo.flags]]];
+	[secondHotKey setName:@"Flycut Second HotKey"];
+	[secondHotKey setTarget:self];
+	[secondHotKey setAction:@selector(hitSecondHotKey:)];
+	[[SGHotKeyCenter sharedCenter] registerHotKey:secondHotKey];
 }
 
 - (IBAction)toggleMainHotKey:(id)sender
@@ -1424,6 +1499,11 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 			[NSDictionary dictionaryWithObjects:[NSArray arrayWithObjects:[NSNumber numberWithInt:[mainRecorder keyCombo].code],[NSNumber numberWithInt:[mainRecorder keyCombo].flags],nil] forKeys:[NSArray arrayWithObjects:@"keyCode",@"modifierFlags",nil]]
 		forKey:@"ShortcutRecorder mainHotkey"];
 	}
+	else if (aRecorder == secondRecorder) {
+		[[NSUserDefaults standardUserDefaults] setObject:@{@"keyCode": @([secondRecorder keyCombo].code),
+														   @"modifierFlags": @([secondRecorder keyCombo].flags)}
+												  forKey:@"ShortcutRecorder secondHotkey"];
+	}
 }
 
 - (BOOL)shortcutRecorder:(SRRecorderControl *)aRecorder isKeyCode:(NSInteger)keyCode andFlagsTaken:(NSUInteger)flags reason:(NSString **)aReason {
@@ -1433,6 +1513,10 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 - (void)shortcutRecorder:(SRRecorderControl *)aRecorder keyComboDidChange:(KeyCombo)newKeyCombo {
 	if (aRecorder == mainRecorder) {
 		[self toggleMainHotKey: aRecorder];
+		[self setHotKeyPreferenceForRecorder: aRecorder];
+	}
+	else if (aRecorder == secondRecorder) {
+		[self toggleSecondHotKey];
 		[self setHotKeyPreferenceForRecorder: aRecorder];
 	}
 	DLog(@"code: %ld, flags: %lu", (long)newKeyCombo.code, (unsigned long)newKeyCombo.flags);
@@ -1461,6 +1545,8 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 	DLog(@"ending updates");
 	if ( needBezelUpdate && isBezelDisplayed )
 		[self updateBezel];
+	if ( [historyPanel isVisible] )
+		[historyPanel reloadClippings];
 	if ( needMenuUpdate )
 	{
 		DLog(@"launching updateMenu");
@@ -1471,6 +1557,34 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 		});
 	}
 	needBezelUpdate = needMenuUpdate = NO;
+}
+
+- (NSArray *)historyPanel:(HistoryPanel *)panel clippingsInFavorites:(BOOL)favorites {
+	return [flycutOperator clippingsInFavorites:favorites];
+}
+
+- (void)historyPanel:(HistoryPanel *)panel pasteClipping:(FlycutClipping *)clipping inFavorites:(BOOL)favorites {
+	NSString *contents = [flycutOperator pasteContentsOfClipping:clipping inFavorites:favorites];
+	if ( nil == contents )
+		return;
+	[self addClipToPasteboard:contents];
+	[self updateMenu];
+	// Same as pasting from the bezel: give focus back to the app the user came from before synthesizing Cmd-V.
+	[self performSelector:@selector(hideApp) withObject:nil afterDelay:0.2];
+	[self performSelector:@selector(fakeCommandV) withObject:nil afterDelay:0.2];
+}
+
+- (void)historyPanel:(HistoryPanel *)panel copyClipping:(FlycutClipping *)clipping inFavorites:(BOOL)favorites {
+	NSString *contents = [flycutOperator pasteContentsOfClipping:clipping inFavorites:favorites];
+	if ( nil == contents )
+		return;
+	[self addClipToPasteboard:contents];
+	[self updateMenu];
+}
+
+- (void)historyPanel:(HistoryPanel *)panel deleteClipping:(FlycutClipping *)clipping inFavorites:(BOOL)favorites {
+	[flycutOperator deleteClipping:clipping inFavorites:favorites];
+	[self updateMenu];
 }
 
 - (void)insertClippingAtIndex:(int)index {
@@ -1503,6 +1617,12 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 	[[SGHotKeyCenter sharedCenter] unregisterHotKey: mainHotKey];
 	[mainHotKey release];
 	mainHotKey = nil;
+	if ( secondHotKey ) {
+		[[SGHotKeyCenter sharedCenter] unregisterHotKey: secondHotKey];
+		[secondHotKey release];
+		secondHotKey = nil;
+	}
+	[historyPanel dismiss];
 	[self hideBezel];
 	[[NSDistributedNotificationCenter defaultCenter]
 		removeObserver:self
@@ -1516,6 +1636,7 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 
 - (void) dealloc {
 	[bezel release];
+	[historyPanel release];
 	[srTransformer release];
 	[super dealloc];
 }
