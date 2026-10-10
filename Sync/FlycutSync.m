@@ -69,6 +69,9 @@ NSURL *FlycutSyncResolveFileURL(NSString *path, NSData *bookmark, BOOL readOnly,
     BOOL _busy;
     NSUInteger _generation;
     NSString *_lastBackendID;
+    id<FlycutSyncTransport> _pendingTransport;
+    BOOL _pendingShare;
+    void (^_pendingCompletion)(NSError *);
 }
 
 - (instancetype)initWithArchive:(FlycutArchive *)archive {
@@ -113,6 +116,12 @@ NSURL *FlycutSyncResolveFileURL(NSString *path, NSData *bookmark, BOOL readOnly,
             if (generation != self->_generation) return;
             if (error || !collection) {
                 [self setStatus:[NSString stringWithFormat:@"Sync error: %@", error.localizedDescription ?: @"No collection"] busy:NO];
+                if ([error.domain isEqual:FlycutSyncErrorDomain] && error.code == FlycutSyncTransientError) {
+                    self->_pendingTransport = transport;
+                    self->_pendingShare = share;
+                    self->_pendingCompletion = [completion copy];
+                    self->_timer = [NSTimer scheduledTimerWithTimeInterval:15 target:self selector:@selector(retryConnection) userInfo:nil repeats:NO];
+                }
             } else {
                 self->_transport = transport;
                 self->_lastBackendID = [transport.backendID copy];
@@ -157,11 +166,21 @@ NSURL *FlycutSyncResolveFileURL(NSString *path, NSData *bookmark, BOOL readOnly,
     }];
 }
 
+- (void)retryConnection {
+    if (!_pendingTransport || _busy) return;
+    id<FlycutSyncTransport> transport = _pendingTransport;
+    BOOL share = _pendingShare;
+    void (^completion)(NSError *) = _pendingCompletion;
+    [self configureTransport:transport sharingExistingEvents:share completion:completion];
+}
+
 - (void)stop {
     ++_generation;
     [_timer invalidate];
     _timer = nil;
     _transport = nil;
+    _pendingTransport = nil;
+    _pendingCompletion = nil;
     [self setStatus:@"Sync off" busy:NO];
 }
 

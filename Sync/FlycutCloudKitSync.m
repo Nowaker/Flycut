@@ -8,6 +8,11 @@ static BOOL CloudError(NSError **error, NSString *message) {
     return NO;
 }
 
+static BOOL CloudRetryError(NSError **error, NSString *message) {
+    if (error) *error = [NSError errorWithDomain:FlycutSyncErrorDomain code:FlycutSyncTransientError userInfo:@{NSLocalizedDescriptionKey:message}];
+    return NO;
+}
+
 static BOOL HasCloudEntitlements(NSString *identifier) {
     SecTaskRef task = SecTaskCreateFromSelf(kCFAllocatorDefault);
     if (!task) return NO;
@@ -41,7 +46,7 @@ static BOOL HasCloudEntitlements(NSString *identifier) {
         recordID = user; failure = requestError; dispatch_semaphore_signal(done);
     }];
     if (dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, 35 * NSEC_PER_SEC))) {
-        CloudError(error, @"CloudKit account lookup timed out; reconnect to retry."); return nil;
+        CloudRetryError(error, @"CloudKit account lookup timed out; connection will retry."); return nil;
     }
     if (!recordID) { [self reportError:failure output:error]; return nil; }
     return recordID.recordName;
@@ -49,8 +54,11 @@ static BOOL HasCloudEntitlements(NSString *identifier) {
 - (BOOL)reportError:(NSError *)failure output:(NSError **)error {
     NSNumber *retry = failure.userInfo[CKErrorRetryAfterKey];
     if (retry) _retryAfter = [NSDate dateWithTimeIntervalSinceNow:retry.doubleValue];
-    return CloudError(error, [NSString stringWithFormat:@"CloudKit request failed (code %ld). Check iCloud sign-in, container provisioning, and network; unacknowledged events will retry%@.",
-        (long)failure.code, retry ? @" after the server's retry delay" : @""]);
+    BOOL transient = retry || failure.code == CKErrorNetworkUnavailable || failure.code == CKErrorNetworkFailure ||
+        failure.code == CKErrorServiceUnavailable || failure.code == CKErrorRequestRateLimited || failure.code == CKErrorZoneBusy;
+    NSString *message = [NSString stringWithFormat:@"CloudKit request failed (code %ld). %@", (long)failure.code,
+        transient ? @"Pending events retry after the server's delay." : @"Check sign-in and provisioning, then Apply to reconnect."];
+    return transient ? CloudRetryError(error, message) : CloudError(error, message);
 }
 - (BOOL)runOperation:(CKDatabaseOperation *)operation semaphore:(dispatch_semaphore_t)done error:(NSError **)error {
     operation.configuration.timeoutIntervalForRequest = 30;
@@ -58,7 +66,7 @@ static BOOL HasCloudEntitlements(NSString *identifier) {
     [_database addOperation:operation];
     if (dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, 65 * NSEC_PER_SEC))) {
         [operation cancel];
-        return CloudError(error, @"CloudKit timed out; unacknowledged events will retry.");
+        return CloudRetryError(error, @"CloudKit timed out; unacknowledged events will retry.");
     }
     return YES;
 }
@@ -77,12 +85,15 @@ static BOOL HasCloudEntitlements(NSString *identifier) {
     return record;
 }
 - (NSString *)prepareCollection:(NSString *)localCollection error:(NSError **)error {
+    if (_retryAfter && [_retryAfter timeIntervalSinceNow] > 0) {
+        CloudRetryError(error, @"CloudKit retry delay is active. Reconnection will retry after the server's delay."); return nil;
+    }
     NSCharacterSet *characters = [NSCharacterSet characterSetWithCharactersInString:@"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-"];
     if (![_identifier hasPrefix:@"iCloud."] || _identifier.length <= 7 || [_identifier rangeOfCharacterFromSet:characters.invertedSet].location != NSNotFound) {
         CloudError(error, @"Enter your provisioned iCloud container identifier."); return nil;
     }
     if (!HasCloudEntitlements(_identifier)) {
-        CloudError(error, @"This app is not provisioned for the selected CloudKit container. Install an entitled signed build before enabling CloudKit."); return nil;
+        CloudError(error, @"CloudKit is not provisioned. Install a signed build for this container."); return nil;
     }
     _accountID = [self currentAccount:error];
     if (!_accountID) return nil;

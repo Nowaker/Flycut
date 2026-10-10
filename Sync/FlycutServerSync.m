@@ -96,16 +96,16 @@ static BOOL ServerError(NSError **error, NSInteger code, NSString *message) {
     [task resume];
     if (dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, 35 * NSEC_PER_SEC))) {
         [task cancel]; [session invalidateAndCancel];
-        ServerError(error, 1, @"Server request timed out; it will be retried."); return nil;
+        ServerError(error, FlycutSyncTransientError, @"Server request timed out; it will be retried."); return nil;
     }
     [session finishTasksAndInvalidate];
-    if (networkError) { ServerError(error, 1, @"Server unavailable or TLS validation failed; it will be retried."); return nil; }
+    if (networkError) { ServerError(error, FlycutSyncTransientError, @"Server unavailable or TLS validation failed; it will be retried."); return nil; }
     if (status < 200 || status >= 300) {
         NSString *message = status == 400 ? @"Server rejected cursor or event. Reset this backend checkpoint explicitly to replay." :
             status == 401 ? @"Server authentication failed. Check the selected .env credential file." :
             status == 403 ? @"This credential is not authorized for the collection." :
             status == 409 ? @"Conflicting immutable event on server. No upload was acknowledged." : @"Server request failed; it will be retried.";
-        ServerError(error, status, message); return nil;
+        ServerError(error, status >= 500 || status == 429 ? FlycutSyncTransientError : status, message); return nil;
     }
     id json = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
     if (![json isKindOfClass:NSDictionary.class]) { ServerError(error, 1, @"Invalid server response."); return nil; }

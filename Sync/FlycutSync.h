@@ -10,6 +10,9 @@
 
 extern NSString * const FlycutSyncErrorDomain;
 extern NSString * const FlycutSyncStatusDidChangeNotification;
+typedef NS_ENUM(NSInteger, FlycutSyncErrorCode) {
+    FlycutSyncTransientError = 1001
+};
 BOOL FlycutSyncValidateManifest(NSDictionary *manifest, NSError **error);
 BOOL FlycutSyncIsSandboxed(void);
 BOOL FlycutSyncPerformBatch(BOOL (^operation)(NSError **), NSError **error);

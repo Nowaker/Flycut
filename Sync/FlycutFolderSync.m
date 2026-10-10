@@ -89,7 +89,12 @@ static int OpenDirectoryAt(int parent, NSString *name, BOOL create, NSError **er
 - (NSString *)backendID { return [@"folder:" stringByAppendingString:_directory]; }
 - (int)openRoot:(NSError **)error {
     int fd = open(_directory.fileSystemRepresentation, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
-    if (fd < 0) FolderError(error, @"Choose an existing, non-symlink sync folder.");
+    if (fd < 0) {
+        int failure = errno;
+        FolderError(error, @"Choose an existing, non-symlink sync folder.");
+        if ((failure == ENOENT || failure == EIO || failure == ENXIO) && error)
+            *error = [NSError errorWithDomain:FlycutSyncErrorDomain code:FlycutSyncTransientError userInfo:@{NSLocalizedDescriptionKey:@"Choose an existing, non-symlink sync folder. Unavailable folders retry automatically."}];
+    }
     return fd;
 }
 - (NSString *)prepareCollection:(NSString *)localCollection error:(NSError **)error {
