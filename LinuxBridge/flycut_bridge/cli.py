@@ -12,17 +12,19 @@ import typer
 from pydantic import ValidationError
 
 from .archive import Archive
+from .clipboard import ManagerName, Observer, import_history, manager, select
 from .folder import Folder
-from .klipper import Klipper, Observer
 from .protocol import EVENTS, BridgeError, identifier
 from .query import Search, item_text, search
 from .service import Service
 
 APP: Final = typer.Typer(help=(
-    "Flycut Archive V1 for Linux/KDE. Requires Python 3.12+, uv and busctl for Klipper. "
+    "Flycut Archive V1 for Linux. Requires Python 3.12+, uv and busctl. "
+    "Autodetects running GPaste2 (Cinnamon/GNOME) or optional Klipper (KDE). "
+    "GPaste also needs xclip/xsel on X11 or wl-clipboard on Wayland, with desktop session environment. "
     "Run: uv run --project LinuxBridge flycut-bridge --help. Sync defaults off. "
-    "Imports never copy or paste. Polling observes Klipper's text/display API, not raw MIME, "
-    "and may miss changes faster than the polling interval. No CloudKit gateway. "
+    "Imports never copy or paste. GPaste observes actual platform clipboard; Klipper uses its text/display API. "
+    "Polling may miss changes faster than the polling interval. No CloudKit gateway. "
     "Archive/folder/service logs retain deleted text; deletion is not secure erasure."),
     pretty_exceptions_enable=False)
 DEFAULT_DB: Final = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local/share"))) / "flycut/archive.sqlite3"
@@ -39,7 +41,7 @@ def init(collection: str, db: Database = DEFAULT_DB) -> None:
 @APP.command()
 def capture(db: Database = DEFAULT_DB) -> None:
     """Capture exact UTF-8 text from stdin, including trailing newlines."""
-    print(Archive(db).capture(sys.stdin.read()))
+    print(Archive(db).capture(sys.stdin.buffer.read().decode("utf-8")))
 
 
 @APP.command("search")
@@ -136,35 +138,39 @@ def sync(db: Database = DEFAULT_DB, folder: Path | None = None, server: str | No
 
 
 @APP.command()
-def copy(item: str, db: Database = DEFAULT_DB, moves_to_top: bool = False) -> None:
-    """Explicitly copy to Klipper Clipboard AND PRIMARY; never synthesize a paste key."""
-    Klipper().select(Archive(db), identifier(item), moves_to_top)
-    print("Copied explicitly to Clipboard/PRIMARY; paste in your target application yourself.")
+def copy(item: str, db: Database = DEFAULT_DB, moves_to_top: bool = False,
+         desktop: ManagerName = "auto") -> None:
+    """Explicitly copy (Klipper also writes PRIMARY); never synthesize a paste key."""
+    select(Archive(db), manager(desktop), identifier(item), moves_to_top=moves_to_top)
+    print("Copied explicitly; paste in your target application yourself.")
 
 
-@APP.command("import-klipper")
-def import_klipper(db: Database = DEFAULT_DB, confirm: bool = False) -> None:
-    """One-time import of Klipper display text. Separate from watch startup; no clipboard write."""
+@APP.command("import-history")
+def import_desktop_history(db: Database = DEFAULT_DB, confirm: bool = False,
+                           desktop: ManagerName = "auto") -> None:
+    """One-time GPaste text/Klipper display history import. Never a startup side effect."""
     if not confirm:
-        raise BridgeError("use --confirm to import existing Klipper display history once")
-    print("Importing Klipper history...", flush=True)
-    print(f"Imported {Klipper().import_history(Archive(db))} entries; clipboard unchanged.")
+        raise BridgeError("use --confirm to import existing manager history once")
+    print("Importing desktop history...", flush=True)
+    print(f"Imported {import_history(Archive(db), manager(desktop))} entries; clipboard unchanged.")
 
 
 @APP.command()
 def watch(db: Database = DEFAULT_DB, interval: Annotated[float, typer.Option(min=0.1)] = 0.5,
           folder: Path | None = None, server: str | None = None,
-          secured_tailnet: bool = False, cycles: Annotated[int, typer.Option(min=0)] = 0) -> None:
-    """Seed current Klipper text without capture, then observe local transitions. Ctrl+C stops."""
+          secured_tailnet: bool = False, cycles: Annotated[int, typer.Option(min=0)] = 0,
+          desktop: ManagerName = "auto") -> None:
+    """Seed current desktop text without capture, then observe local transitions. Ctrl+C stops."""
     archive = Archive(db)
-    klipper = Klipper()
-    observer = Observer(archive, klipper.current())
+    clipboard = manager(desktop)
+    observer = Observer(archive, clipboard.current(), clipboard)
     selected = backend(folder, server, secured_tailnet)
-    print("Watching Klipper (startup seeded, not captured); sync " + ("on." if selected else "off."), flush=True)
+    print(f"Watching {clipboard.name} (startup seeded, not captured); sync " +
+          ("on." if selected else "off."), flush=True)
     iteration = 0
     while cycles == 0 or iteration < cycles:
         try:
-            if observer.observe(klipper.current()):
+            if observer.observe(clipboard.current()):
                 print("Local capture committed.", flush=True)
             if selected:
                 print("Syncing...", flush=True)
