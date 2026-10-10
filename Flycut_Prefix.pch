@@ -5,8 +5,14 @@
 #ifdef __OBJC__
 #import <Cocoa/Cocoa.h>
 
-#define kiCloudId @"iCloud.com.generalarcade.flycut"
-#define kFlycutHelperId @"com.generalarcade.flycuthelper"
+// Derived from the bundle id so a build under a different FLYCUT_BUNDLE_ID gets its own iCloud container and helper.
+#define kiCloudId [@"iCloud." stringByAppendingString:[[NSBundle mainBundle] bundleIdentifier]]
+#define kFlycutHelperId [[[NSBundle mainBundle] bundleIdentifier] stringByAppendingString:@".helper"]
+
+// FLYCUT_CLOUDKIT_ENABLED comes from the FLYCUT_CLOUDKIT build setting. CloudKit needs a provisioning profile for an iCloud container registered to the signing team, so it is off unless a build opts in.
+#ifndef FLYCUT_CLOUDKIT_ENABLED
+#define FLYCUT_CLOUDKIT_ENABLED 0
+#endif
 
 // The SANDBOXING flag isn't tightly coupled with the sandboxing entitlement, so this amounts to more of a code policy flag than a feature availability flag at the moment. [AppController isAppSandboxed] is more effective for feature availability checks.
 //#define SANDBOXING

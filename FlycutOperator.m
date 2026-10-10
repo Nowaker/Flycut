@@ -638,6 +638,7 @@
 
 -(void) registerOrDeregisterICloudSync
 {
+#if FLYCUT_CLOUDKIT_ENABLED
 	if ( [[NSUserDefaults standardUserDefaults] boolForKey:@"syncSettingsViaICloud"] ) {
 		[[MJCloudKitUserDefaultsSync sharedSync] startWithKeyMatchList:settingsSyncList
 								  withContainerIdentifier:kiCloudId];
@@ -676,6 +677,7 @@
 
 		[[MJCloudKitUserDefaultsSync sharedSync] stopForKeyMatchList:@[@"store"]];
 	}
+#endif
 }
 
 -(NSDictionary*) checkPreferencesChanges:(NSDictionary*)changes
@@ -994,7 +996,9 @@
 
 -(void) checkCloudKitUpdates
 {
+#if FLYCUT_CLOUDKIT_ENABLED
 	[[MJCloudKitUserDefaultsSync sharedSync] checkCloudKitUpdates];
+#endif
 }
 
 -(bool) loadEngineFrom:(NSDictionary*)loadDict key:(NSString*)listKey into:(FlycutStore*)store

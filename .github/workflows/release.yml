@@ -183,7 +183,7 @@ jobs:
           echo ""
           echo "**Upgrading and paste stopped working?** Reset the permission and re-grant it:"
           echo '```'
-          echo "tccutil reset Accessibility com.generalarcade.flycut"
+          echo "tccutil reset Accessibility net.nowaker.flycut.claude"
           echo '```'
           echo ""
           echo "_Build: $SIGN._"

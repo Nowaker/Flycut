@@ -109,6 +109,7 @@
 
 - (void)registerOrDeregisterICloudSync
 {
+#if FLYCUT_CLOUDKIT_ENABLED
 	if ( [[NSUserDefaults standardUserDefaults] boolForKey:@"syncSettingsViaICloud"] ) {
 		[[MJCloudKitUserDefaultsSync sharedSync] removeNotificationsFor:MJSyncNotificationChanges forTarget:self];
 		[[MJCloudKitUserDefaultsSync sharedSync] addNotificationFor:MJSyncNotificationChanges withSelector:@selector(checkPreferencesChanges:) withTarget: self];
@@ -124,6 +125,7 @@
 	}
 
 	[flycutOperator registerOrDeregisterICloudSync];
+#endif
 }
 
 - (void)showAccessibilityAlert {
@@ -682,6 +684,9 @@
     autoSaveToLocationButton.hidden = YES;
     saveFromBezelToLabel.hidden = YES;
 #endif
+#if !FLYCUT_CLOUDKIT_ENABLED
+    [self hideICloudSyncPreferencesIn:[prefsPanel contentView]];
+#endif
     if ([AppController isAppSandboxed]) {
         // Saving to a prior-selected location while sandboxed would be unpleasant, so these really should be disabled always when sandboxed but can still show where the saves happen so the user knows what to expect.
         saveToLocationButton.enabled = NO;
@@ -689,6 +694,20 @@
         autoSaveToLocationButton.enabled = NO;
         [autoSaveToLocationButton setTitle:@"App Sandbox"];
     }
+}
+
+// The iCloud Sync label and checkboxes have no outlets, so they are found by their title and bindings.
+-(void) hideICloudSyncPreferencesIn:(NSView*)view
+{
+	for ( NSView *subview in [view subviews] ) {
+		NSString *boundKeyPath = [[subview infoForBinding:@"value"] objectForKey:NSObservedKeyPathKey];
+		BOOL isSyncCheckbox = [boundKeyPath hasSuffix:@"ViaICloud"];
+		BOOL isSyncLabel = [subview isKindOfClass:[NSTextField class]] && [[(NSTextField*)subview stringValue] isEqualToString:@"iCloud Sync:"];
+		if ( isSyncCheckbox || isSyncLabel )
+			subview.hidden = YES;
+		else
+			[self hideICloudSyncPreferencesIn:subview];
+	}
 }
 
 -(IBAction) showPreferencePanel:(id)sender
@@ -1039,8 +1058,10 @@
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification
 {
+#if FLYCUT_CLOUDKIT_ENABLED
 	// Enable notification from CloudKit
 	[NSApp registerForRemoteNotificationTypes:NSRemoteNotificationTypeNone];// silent push notification!
+#endif
 
 	//Create our hot key
 	[self toggleMainHotKey:[NSNull null]];

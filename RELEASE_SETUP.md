@@ -57,6 +57,22 @@ notarizes if secrets are set), and creates the GitHub Release. Release notes are
 taken from the matching `## 1.9.7` section of `CHANGELOG.md`, falling back to the
 commit log if that section is absent.
 
+## Fork build settings
+
+Project-level build settings, overridable on the `xcodebuild` command line:
+
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `FLYCUT_BUNDLE_ID` | `net.nowaker.flycut.claude` | App bundle id; the helper gets `<id>.helper`, the iCloud container `iCloud.<id>` |
+| `FLYCUT_CLOUDKIT` | `NO` | `YES` compiles in iCloud sync, signs with `FlycutDeveloperIDCloudKit.entitlements` and switches to automatic signing, which needs a paid Apple Developer team with the container registered |
+
+Local signed build:
+
+```
+DEVELOPER_DIR=~/Applications/Xcode-26.3.app/Contents/Developer \
+  xcodebuild -project Flycut.xcodeproj -scheme Flycut -configuration Release build
+```
+
 ## Two channels: entitlements
 
 1.9.7 ships on **both** channels, which need different entitlements:
