@@ -40,7 +40,8 @@ static BOOL ServerError(NSError **error, NSInteger code, NSString *message) {
     for (NSString *line in [contents componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet]) {
         if ([line hasPrefix:@"FLYCUT_SYNC_TOKEN="]) {
             NSString *token = [line substringFromIndex:@"FLYCUT_SYNC_TOKEN=".length];
-            if (token.length && [token rangeOfCharacterFromSet:NSCharacterSet.whitespaceAndNewlineCharacterSet].location == NSNotFound) return token;
+            NSCharacterSet *characters = [NSCharacterSet characterSetWithCharactersInString:@"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~+/="];
+            if (token.length && [token rangeOfCharacterFromSet:characters.invertedSet].location == NSNotFound) return token;
         }
     }
     ServerError(error, 1, @"Credential file unavailable or FLYCUT_SYNC_TOKEN is missing. Credentials are never saved in preferences.");

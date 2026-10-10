@@ -131,6 +131,12 @@ int main(int argc, const char *argv[]) {
         FlycutArchive *a = [[FlycutArchive alloc] initWithPath:[root stringByAppendingPathComponent:@"a.sqlite"] error:&error];
         FlycutArchive *b = [[FlycutArchive alloc] initWithPath:[root stringByAppendingPathComponent:@"b.sqlite"] error:&error];
         Require(a && b && !error, @"isolated archives open");
+        NSString *invalidCredentialPath = [root stringByAppendingPathComponent:@".env.invalid-header"];
+        Require([@"FLYCUT_SYNC_TOKEN=invalid\0header" writeToFile:invalidCredentialPath atomically:YES encoding:NSUTF8StringEncoding error:&error], @"own invalid-header credential fixture created");
+        FlycutServerSync *invalidCredential = [[FlycutServerSync alloc] initWithURL:[NSURL URLWithString:@"http://127.0.0.1:1"] collectionID:a.collectionID credentialFileURL:[NSURL fileURLWithPath:invalidCredentialPath] securedTailnetHTTP:NO];
+        error = nil;
+        Require([invalidCredential prepareCollection:a.collectionID error:&error] == nil && [error.localizedDescription containsString:@"FLYCUT_SYNC_TOKEN"], @"control characters cannot reach authorization headers");
+        Require([files removeItemAtPath:invalidCredentialPath error:&error], @"owned invalid credential fixture removed");
         if (argc >= 5) {
             BOOL tailnet = argc >= 6 && !strcmp(argv[5], "secured-tailnet");
             FlycutServerSync *first = [[FlycutServerSync alloc] initWithURL:[NSURL URLWithString:@(argv[2])] collectionID:@(argv[3]) credentialFileURL:[NSURL fileURLWithPath:@(argv[4])] securedTailnetHTTP:tailnet];
