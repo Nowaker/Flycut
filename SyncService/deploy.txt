@@ -66,3 +66,12 @@ Deletion events are not secure erasure: database/backups retain original text.
 
 Validation (no actual credentials are read or printed):
 python3 -m unittest discover -s SyncService -p 'test_*.py' -v
+python3 -m SyncService.fixture_check FlycutEngine/Tests/Fixtures/archive-v1.json
+
+Cross-machine live QA: source/export client .env without displaying it, run
+python3 -m SyncService.live_check prepare --state <owned-qa-state.json>
+Restart the remote flycut-gpt-sync.service, then run
+python3 -m SyncService.live_check verify --state <owned-qa-state.json>
+This checks auth, immutable/atomic ingestion, late events and durable cursors.
+Verify tombstones ONLY the two synthetic captures tracked in the state file.
+Credentials and request/event bodies are never printed by the driver.
