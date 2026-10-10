@@ -239,11 +239,31 @@ static NSString * const kCellIdentifier = @"HistoryPanelClipping";
 	return row >= 0 && row < (NSInteger)[shownClippings count] ? [shownClippings objectAtIndex:row] : nil;
 }
 
+// Letters with a stroke or bar have no Unicode decomposition, so diacritic-insensitive search leaves them
+// alone; folding them lets "zolc" find "żółć". Strings without any are returned as they are.
+static NSString *FoldUndecomposableLetters(NSString *string)
+{
+	static NSDictionary *replacements;
+	static NSCharacterSet *letters;
+	static dispatch_once_t once;
+	dispatch_once(&once, ^{
+		replacements = [@{@"ł": @"l", @"Ł": @"L", @"đ": @"d", @"Đ": @"D", @"ø": @"o", @"Ø": @"O",
+						  @"ħ": @"h", @"Ħ": @"H", @"ŧ": @"t", @"Ŧ": @"T", @"ı": @"i"} retain];
+		letters = [[NSCharacterSet characterSetWithCharactersInString:[[replacements allKeys] componentsJoinedByString:@""]] retain];
+	});
+	if ( [string rangeOfCharacterFromSet:letters].location == NSNotFound )
+		return string;
+	NSMutableString *folded = [[string mutableCopy] autorelease];
+	for ( NSString *letter in replacements )
+		[folded replaceOccurrencesOfString:letter withString:[replacements objectForKey:letter] options:0 range:NSMakeRange(0, [folded length])];
+	return folded;
+}
+
 // Every whitespace-separated word must appear somewhere in the clipping, in any order.
 - (NSArray *)clippingsMatching:(NSString *)search
 {
 	NSMutableArray *words = [NSMutableArray array];
-	for ( NSString *word in [search componentsSeparatedByCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] )
+	for ( NSString *word in [FoldUndecomposableLetters(search) componentsSeparatedByCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] )
 		if ( [word length] > 0 )
 			[words addObject:word];
 	if ( [words count] == 0 )
@@ -251,7 +271,7 @@ static NSString * const kCellIdentifier = @"HistoryPanelClipping";
 
 	NSStringCompareOptions options = NSCaseInsensitiveSearch | NSDiacriticInsensitiveSearch;
 	NSIndexSet *matching = [allClippings indexesOfObjectsWithOptions:NSEnumerationConcurrent passingTest:^BOOL(FlycutClipping *clipping, NSUInteger idx, BOOL *stop) {
-		NSString *contents = [clipping contents];
+		NSString *contents = FoldUndecomposableLetters([clipping contents]);
 		for ( NSString *word in words )
 			if ( [contents rangeOfString:word options:options].location == NSNotFound )
 				return NO;
