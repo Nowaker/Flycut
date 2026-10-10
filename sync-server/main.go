@@ -230,21 +230,35 @@ func (s *server) replace(w http.ResponseWriter, r *http.Request, machine string)
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Clipboard history is private, so the server must not answer on every interface.
-func checkListenAddress(addr string) error {
-	host, _, err := net.SplitHostPort(addr)
+// listenAddresses turns -listen into the addresses to bind: an IP as given, or every address a host
+// name resolves to, so a Tailscale name covers both its IPv4 and IPv6 address. Clipboard history is
+// private, so none of them may be the address that means every interface.
+func listenAddresses(addr string) ([]string, error) {
+	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	ip := net.ParseIP(host)
-	if host == "" || (ip != nil && ip.IsUnspecified()) {
-		return fmt.Errorf("refusing to listen on all interfaces (%q); give a loopback or Tailscale address", addr)
+	if host == "" {
+		return nil, fmt.Errorf("refusing to listen on all interfaces (%q); give a loopback or Tailscale address or name", addr)
 	}
-	return nil
+	ips := []string{host}
+	if net.ParseIP(host) == nil {
+		if ips, err = net.LookupHost(host); err != nil {
+			return nil, fmt.Errorf("cannot resolve %s: %w", host, err)
+		}
+	}
+	addrs := make([]string, 0, len(ips))
+	for _, ip := range ips {
+		if parsed := net.ParseIP(ip); parsed == nil || parsed.IsUnspecified() {
+			return nil, fmt.Errorf("refusing to listen on all interfaces (%q); give a loopback or Tailscale address or name", addr)
+		}
+		addrs = append(addrs, net.JoinHostPort(ip, port))
+	}
+	return addrs, nil
 }
 
 func main() {
-	listen := flag.String("listen", "127.0.0.1:8742", "address to listen on (loopback or a Tailscale address)")
+	listen := flag.String("listen", "127.0.0.1:8742", "host:port to listen on: a loopback or Tailscale address, or a name resolving only to such")
 	dataDir := flag.String("data", "", "directory holding the logs")
 	tokenFile := flag.String("token-file", "", "file containing the bearer token clients must send")
 	flag.Parse()
@@ -252,7 +266,8 @@ func main() {
 	if *dataDir == "" || *tokenFile == "" {
 		log.Fatal("-data and -token-file are required")
 	}
-	if err := checkListenAddress(*listen); err != nil {
+	addrs, err := listenAddresses(*listen)
+	if err != nil {
 		log.Fatal(err)
 	}
 	raw, err := os.ReadFile(*tokenFile)
@@ -268,10 +283,17 @@ func main() {
 	}
 
 	srv := &http.Server{
-		Addr:              *listen,
 		Handler:           &server{dir: *dataDir, token: token},
 		ReadHeaderTimeout: 10 * time.Second,
 	}
-	log.Printf("flycut-sync-server listening on %s, logs in %s", *listen, *dataDir)
-	log.Fatal(srv.ListenAndServe())
+	failed := make(chan error)
+	for _, addr := range addrs {
+		listener, err := net.Listen("tcp", addr)
+		if err != nil {
+			log.Fatal(err)
+		}
+		go func() { failed <- srv.Serve(listener) }()
+	}
+	log.Printf("flycut-sync-server listening on %s, logs in %s", strings.Join(addrs, ", "), *dataDir)
+	log.Fatal(<-failed)
 }

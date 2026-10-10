@@ -1,12 +1,13 @@
 # systemd user unit: ~/.config/systemd/user/flycut-sync-server.service
-# Replace LISTEN with this machine's Tailscale address (tailscale ip -4), or 127.0.0.1 behind an HTTPS proxy.
+# Replace HOST with this machine's Tailscale name (e.g. desktop.example.ts.net), or 127.0.0.1 behind an HTTPS proxy.
+# A name is bound on every address it resolves to, so tailscaled must be up; Restart covers a boot race.
 [Unit]
 Description=Flycut clipboard history sync server
 After=network-online.target tailscaled.service
 Wants=network-online.target
 
 [Service]
-ExecStart=%h/.local/share/flycut-sync-server/flycut-sync-server -listen LISTEN:8742 -data %h/.local/share/flycut-sync-server/logs -token-file %h/.local/share/flycut-sync-server/token
+ExecStart=%h/.local/share/flycut-sync-server/flycut-sync-server -listen HOST:8742 -data %h/.local/share/flycut-sync-server/logs -token-file %h/.local/share/flycut-sync-server/token
 UMask=0077
 Restart=on-failure
 RestartSec=5

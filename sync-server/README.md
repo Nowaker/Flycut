@@ -12,8 +12,8 @@ mv flycut-sync-server ~/.local/share/flycut-sync-server/
 (umask 077; openssl rand -hex 32 > ~/.local/share/flycut-sync-server/token)
 ```
 
-Install `flycut-sync-server.service` as a systemd user unit, with `LISTEN` replaced by the machine's
-Tailscale address, then `systemctl --user enable --now flycut-sync-server`.
+Install `flycut-sync-server.service` as a systemd user unit, with `HOST` replaced by the machine's
+Tailscale name (it listens on every address the name resolves to), then `systemctl --user enable --now flycut-sync-server`.
 
 The server refuses to listen on all interfaces. Bind it to a Tailscale address, or to `127.0.0.1` behind
 an HTTPS reverse proxy.
@@ -22,7 +22,7 @@ an HTTPS reverse proxy.
 
 Preferences > History > Sync history through a server:
 
-- Address: `http://<tailscale address or MagicDNS name>:8742`. Plain `http://` is accepted only when every
+- Address: `http://<the server's Tailscale name>:8742`. Plain `http://` is accepted only when every
   address the name resolves to is loopback or on the tailnet; anything else needs `https://`.
 - Token: the contents of the token file. Flycut keeps it in the login keychain.
 

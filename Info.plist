@@ -30,6 +30,12 @@
 	<string>1</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Flycut needs this permission to be able to paste text into other applications, and add itself to Login Items to be launched on login.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<!-- Server sync allows plain http:// only to loopback and Tailscale addresses (FlycutServerMirror.m) and https:// otherwise. -->
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 	<key>NSHumanReadableCopyright</key>
 	<string>(c) General Arcade, 2011-2020</string>
 	<key>NSMainNibFile</key>

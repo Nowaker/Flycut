@@ -1,5 +1,5 @@
 # systemd user unit: ~/.config/systemd/user/flycut-copyq-bridge.service
-# Replace SERVER with the flycut-sync-server address, e.g. http://100.x.y.z:8742.
+# Replace SERVER with the flycut-sync-server address, e.g. http://desktop.example.ts.net:8742.
 [Unit]
 Description=Flycut clipboard history sync for CopyQ
 After=graphical-session.target flycut-sync-server.service

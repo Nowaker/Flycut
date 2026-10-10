@@ -20,7 +20,7 @@ Items already in CopyQ when the bridge first starts stay local; `--export-existi
 ```sh
 mkdir -p ~/.local/share/flycut-copyq-bridge
 cp flycut-copyq-bridge.py ~/.local/share/flycut-copyq-bridge/
-sed 's|SERVER|http://100.x.y.z:8742|' flycut-copyq-bridge.service > ~/.config/systemd/user/flycut-copyq-bridge.service
+sed 's|SERVER|http://desktop.example.ts.net:8742|' flycut-copyq-bridge.service > ~/.config/systemd/user/flycut-copyq-bridge.service
 systemctl --user daemon-reload && systemctl --user enable --now flycut-copyq-bridge
 journalctl --user -u flycut-copyq-bridge -f
 ```
