@@ -11,7 +11,6 @@ fi
 root=$(cd "$(dirname "$0")/../.." && pwd)
 build=$(mktemp -d "${TMPDIR:-/tmp}/flycut-archive-build.XXXXXX")
 trap 'rm -rf "$build"' EXIT
-export DEVELOPER_DIR=${DEVELOPER_DIR:-/Users/nowaker/Applications/Xcode-26.3.app/Contents/Developer}
 xcrun clang -fno-objc-arc -Wall -Wextra -Werror -Wno-unused-parameter \
     -mmacosx-version-min=10.13 -framework Foundation -framework CoreFoundation \
     -lsqlite3 -I "$root/FlycutEngine" "$root/FlycutEngine/FlycutArchive.m" \
