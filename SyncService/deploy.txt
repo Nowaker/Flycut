@@ -1,0 +1,56 @@
+Flycut event sync service (Python 3.10+, no runtime dependencies)
+
+Run from the repository root. Choose a collection UUID once and share it with
+clients. Joining a collection is an explicit client decision, not auto-merge.
+Create .env with mode 600 using your editor or the safe credential ingestion UI:
+FLYCUT_SYNC_GRANTS='{"<random-token-at-least-32-ASCII-characters>":["<collection-uuid>"]}'
+Use independent random tokens per device. A token can have several collections.
+Never pass real tokens on command lines or put them in source/config tracked by git.
+Keep .env outside logs, backups published online, and version control.
+
+mkdir -p "$HOME/.local/share/flycut-sync"
+python3 -m SyncService.server --help
+python3 -m SyncService.server --database "$HOME/.local/share/flycut-sync/events.sqlite" --env-file .env --collection <collection-uuid>
+
+Linux persistent deployment: install the checkout in /opt/flycut, make the
+database directory owned by your unprivileged service account, and put .env
+in /opt/flycut/.env with mode 600. Adapt the installed SyncService/flycut-sync.service
+ExecStart collection UUID and User, then:
+sudo install -m 644 SyncService/flycut-sync.service /etc/systemd/system/flycut-sync.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now flycut-sync.service
+sudo systemctl status flycut-sync.service
+
+Default listener is 127.0.0.1:8787. For a secured Tailscale network explicitly
+add --bind <100.x.y.z> --secured-tailnet. Never bind a wildcard address.
+Public access requires an HTTPS reverse proxy to the loopback listener;
+configure request/body/header logging OFF, max request body 8 MiB and request
+timeout >=15 seconds. Restrict network access to intended clients.
+
+Authorization: Authorization: Bearer <token> on every read/write/discovery.
+GET /v1/collections -> {collections:[{protocol,version,collection_id}]}
+GET /v1/collections/<uuid> -> {protocol,version,collection_id}
+POST /v1/collections/<uuid>/events -> array of contract event envelopes;
+returns {accepted:N,inserted:N}. Retry the identical batch after lost response.
+GET /v1/collections/<uuid>/events?after=<opaque-cursor>&limit=200
+returns {events:[],next_cursor:"opaque",has_more:false}. Poll from next_cursor.
+Omit after for initial replay; limit defaults to 200, maximum 1000.
+400 invalid_cursor includes replay_required:true. Ask for explicit safe full
+replay, reset checkpoint, then request without after. Never reset silently.
+401 unauthenticated; 403 unauthorized_collection; 409 conflicting_event;
+503 storage_unavailable. All batches commit atomically before acknowledgement.
+Collections are provisioned on startup only, not remotely created.
+Restart after editing grants to revoke access. Existing SQLite events persist.
+Event IDs are immutable within each collection, validated and compared canonically.
+Explicit client sharing into another collection may preserve item/event IDs.
+Sequence paging includes delayed lower-clock events. No event pruning.
+
+Backup: use sqlite3's online .backup command or Connection.backup API.
+Restore database while service is stopped. After ANY backup restore, invalidate
+old checkpoints before restarting (backups otherwise retain the old identity):
+python3 -m SyncService.server --database <database-path> --env-file .env --collection <collection-uuid> --rotate-cursor-identity
+Cursors survive ordinary restarts. Restores require explicit client replay.
+Deletion events are not secure erasure: database/backups retain original text.
+
+Validation (no actual credentials are read or printed):
+python3 -m unittest discover -s SyncService -p 'test_*.py' -v
