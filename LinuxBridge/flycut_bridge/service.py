@@ -2,13 +2,16 @@
 
 import os
 import socket
-from typing import Annotated
+from ipaddress import IPv4Network, ip_address
+from typing import Annotated, Final
 
 import httpx2
 from pydantic import Field
 
 from .archive import Archive
 from .protocol import BridgeError, Event, Model
+
+MAX_POST_BYTES: Final = 8 * 1024 * 1024
 
 
 class Download(Model):
@@ -28,9 +31,14 @@ class Service:
         if (self.url.scheme not in {"http", "https"} or not self.url.host or
                 self.url.userinfo or self.url.query or self.url.fragment):
             raise BridgeError("service URL must be http(s), without userinfo, query or fragment")
-        if (self.url.scheme != "https" and self.url.host not in {"localhost", "127.0.0.1", "::1"}
-                and not secured_tailnet):
-            raise BridgeError("HTTPS required outside loopback; secured tailnet needs explicit opt-in")
+        if self.url.scheme != "https" and self.url.host not in {"localhost", "127.0.0.1", "::1"}:
+            try:
+                address = ip_address(self.url.host)
+            except ValueError as error:
+                raise BridgeError(
+                    "plaintext tailnet opt-in requires an explicit 100.64/10 IP; use HTTPS for names") from error
+            if not secured_tailnet or address not in IPv4Network("100.64.0.0/10"):
+                raise BridgeError("HTTPS required except loopback or explicitly secured numeric tailnet IP")
         self.token: str = os.environ.get("FLYCUT_SYNC_TOKEN", "")
         if not self.token:
             raise BridgeError("source your .env containing FLYCUT_SYNC_TOKEN before service sync")
@@ -55,16 +63,30 @@ class Service:
                           timeout=httpx2.Timeout(connect=5, read=30, write=10, pool=10),
                           headers={"Authorization": f"Bearer {self.token}"}) as client:
             while batch := archive.events_after(uploaded):
-                content = "[" + ",".join(event.model_dump_json() for _, event in batch) + "]"
-                response = client.post(endpoint, content=content.encode(), headers={"Content-Type": "application/json"})
+                encoded: list[bytes] = []
+                prefix: list[tuple[int, Event]] = []
+                size = 2
+                for sequence, event in batch:
+                    raw = event.model_dump_json().encode("utf-8")
+                    addition = len(raw) + int(bool(encoded))
+                    if size + addition > MAX_POST_BYTES:
+                        if not prefix:
+                            raise BridgeError(
+                                "single event exceeds service 8 MiB body limit; use folder sync; event unacknowledged")
+                        break
+                    encoded.append(raw)
+                    prefix.append((sequence, event))
+                    size += addition
+                content = b"[" + b",".join(encoded) + b"]"
+                response = client.post(endpoint, content=content, headers={"Content-Type": "application/json"})
                 self.check_status(response)
                 accepted = Accepted.model_validate_json(response.content)
-                if accepted.accepted != len(batch):
+                if accepted.accepted != len(prefix):
                     raise BridgeError("server did not acknowledge the complete upload batch")
-                uploaded = batch[-1][0]
+                uploaded = prefix[-1][0]
                 with archive.transaction() as db:
                     db.execute("UPDATE checkpoints SET uploaded=? WHERE backend=?", (uploaded, backend))
-                sent += len(batch)
+                sent += len(prefix)
             while True:
                 response = client.get(endpoint, params={"after": cursor, "limit": 200})
                 self.check_status(response)

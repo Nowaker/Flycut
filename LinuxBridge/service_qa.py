@@ -22,6 +22,13 @@ def require(condition: bool, reason: str) -> None:
 
 
 def main() -> None:
+    for public_url in ("http://203.0.113.1:19787", "http://example.com:19787", "http://[2001:db8::1]:19787"):
+        try:
+            Service(public_url, secured_tailnet=True)
+        except BridgeError:
+            pass
+        else:
+            raise BridgeError("plaintext public URL accepted by secured-tailnet option")
     collection = os.environ["FLYCUT_SYNC_COLLECTION"]
     service = Service(os.environ["FLYCUT_SYNC_URL"], secured_tailnet=True)
     run_id = f"flycut-linux-qa-{uuid4()}"
@@ -56,6 +63,28 @@ def main() -> None:
             else:
                 raise BridgeError("invalid server cursor was silently accepted")
             service.sync(b, replay=True)
+            large_ids = [b.capture(f"{run_id}-large-{index} " + "é" * (250 * 1024)) for index in range(20)]
+            try:
+                service.sync(b)
+                service.sync(a)
+                require(len(search(a, Search(text=run_id + "-large-")).items) == 20,
+                        "UTF-8 byte-bounded multi-batch upload lost large events")
+            finally:
+                for item_id in large_ids:
+                    b.action(item_id, "delete")
+                service.sync(b)
+                service.sync(a)
+            Archive.initialize(root / "oversize.sqlite3", collection)
+            oversized = Archive(root / "oversize.sqlite3")
+            oversized.capture("synthetic unsupported-size clip " + "x" * (9 * 1024 * 1024))
+            try:
+                service.sync(oversized)
+            except BridgeError:
+                with oversized.transaction(write=False) as db:
+                    require(db.execute("SELECT 1 FROM checkpoints WHERE uploaded<>0").fetchone() is None,
+                            "unsupported-size event was acknowledged")
+            else:
+                raise BridgeError("single oversized event accepted by service client")
             late = a.capture(run_id + "-late")
             try:
                 service.sync(a)
@@ -73,7 +102,8 @@ def main() -> None:
         require(not search(a, Search(text=run_id)).items, "owned synthetic items remain visible")
         require(not search(b, Search(text=run_id)).items, "peer synthetic cleanup did not converge")
     print("Real HTTP service QA passed: two-device convergence, favorite, idempotent replay, " +
-          "invalid cursor rejection/explicit replay, late upload, exact owned tombstone cleanup; no clipboard writes.")
+          "invalid cursor rejection/explicit replay, 20 large UTF-8 clips split by 8 MiB body bytes, " +
+          "single oversized event unacknowledged, late upload, exact owned tombstone cleanup; no clipboard writes.")
 
 
 if __name__ == "__main__":
