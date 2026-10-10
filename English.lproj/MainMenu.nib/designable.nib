@@ -647,14 +647,14 @@
                                     <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                     <subviews>
                                         <box fixedFrame="YES" boxType="oldStyle" borderType="none" title="Box" titlePosition="noTitle" translatesAutoresizingMaskIntoConstraints="NO" id="Hst-bx-001">
-                                            <rect key="frame" x="0.0" y="370" width="507" height="150"/>
+                                            <rect key="frame" x="0.0" y="210" width="507" height="310"/>
                                             <autoresizingMask key="autoresizingMask"/>
                                             <view key="contentView" id="Hst-cv-001">
-                                                <rect key="frame" x="0.0" y="0.0" width="507" height="150"/>
+                                                <rect key="frame" x="0.0" y="0.0" width="507" height="310"/>
                                                 <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                                 <subviews>
                                                     <button toolTip="Keep every clipping instead of only the most recent ones." fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hst-ul-001">
-                                                        <rect key="frame" x="14" y="114" width="477" height="18"/>
+                                                        <rect key="frame" x="14" y="274" width="477" height="18"/>
                                                         <autoresizingMask key="autoresizingMask"/>
                                                         <buttonCell key="cell" type="check" title="Keep unlimited history" bezelStyle="regularSquare" imagePosition="left" alignment="left" inset="2" id="Hst-uc-001">
                                                             <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
@@ -666,7 +666,7 @@
                                                         </connections>
                                                     </button>
                                                     <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hst-un-001">
-                                                        <rect key="frame" x="32" y="94" width="459" height="16"/>
+                                                        <rect key="frame" x="32" y="254" width="459" height="16"/>
                                                         <autoresizingMask key="autoresizingMask"/>
                                                         <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="When off, the Remember count on the General tab limits the history." id="Hst-uo-001">
                                                             <font key="font" metaFont="label" size="11"/>
@@ -675,7 +675,7 @@
                                                         </textFieldCell>
                                                     </textField>
                                                     <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hst-al-001">
-                                                        <rect key="frame" x="14" y="58" width="172" height="17"/>
+                                                        <rect key="frame" x="14" y="218" width="172" height="17"/>
                                                         <autoresizingMask key="autoresizingMask"/>
                                                         <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="Delete clippings older than" id="Hst-ac-001">
                                                             <font key="font" metaFont="system"/>
@@ -684,7 +684,7 @@
                                                         </textFieldCell>
                                                     </textField>
                                                     <textField toolTip="Clippings older than this many days are deleted. 0 keeps them forever." verticalHuggingPriority="750" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hst-af-001">
-                                                        <rect key="frame" x="190" y="56" width="60" height="21"/>
+                                                        <rect key="frame" x="190" y="216" width="60" height="21"/>
                                                         <autoresizingMask key="autoresizingMask"/>
                                                         <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" state="on" borderStyle="bezel" alignment="right" drawsBackground="YES" id="Hst-ag-001">
                                                             <numberFormatter key="formatter" formatterBehavior="10_0" positiveFormat="#" negativeFormat="-#" hasThousandSeparators="NO" thousandSeparator="," id="Hst-ah-001">
@@ -704,7 +704,7 @@
                                                         </connections>
                                                     </textField>
                                                     <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hst-ad-001">
-                                                        <rect key="frame" x="254" y="58" width="60" height="17"/>
+                                                        <rect key="frame" x="254" y="218" width="60" height="17"/>
                                                         <autoresizingMask key="autoresizingMask"/>
                                                         <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="days" id="Hst-ae-001">
                                                             <font key="font" metaFont="system"/>
@@ -713,7 +713,7 @@
                                                         </textFieldCell>
                                                     </textField>
                                                     <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hst-an-001">
-                                                        <rect key="frame" x="14" y="34" width="477" height="16"/>
+                                                        <rect key="frame" x="14" y="194" width="477" height="16"/>
                                                         <autoresizingMask key="autoresizingMask"/>
                                                         <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="0 keeps clippings forever. Favorites are never deleted by age." id="Hst-ao-001">
                                                             <font key="font" metaFont="label" size="11"/>
@@ -721,70 +721,70 @@
                                                             <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
                                                         </textFieldCell>
                                                     </textField>
-                                                </subviews>
-                                            </view>
-                                        </box>
-                                        <box fixedFrame="YES" boxType="oldStyle" borderType="none" title="Box" titlePosition="noTitle" translatesAutoresizingMaskIntoConstraints="NO" id="Syn-bx-001">
-                                            <rect key="frame" x="0.0" y="200" width="507" height="160"/>
-                                            <autoresizingMask key="autoresizingMask"/>
-                                            <view key="contentView" id="Syn-cv-001">
-                                                <rect key="frame" x="0.0" y="0.0" width="507" height="160"/>
-                                                <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                                                <subviews>
-                                                    <box verticalHuggingPriority="750" fixedFrame="YES" boxType="separator" translatesAutoresizingMaskIntoConstraints="NO" id="Syn-sp-001">
-                                                        <rect key="frame" x="14" y="152" width="477" height="5"/>
+                                                    <box fixedFrame="YES" boxType="oldStyle" borderType="none" title="Box" titlePosition="noTitle" translatesAutoresizingMaskIntoConstraints="NO" id="Syn-bx-001">
+                                                        <rect key="frame" x="0.0" y="0.0" width="507" height="160"/>
                                                         <autoresizingMask key="autoresizingMask"/>
+                                                        <view key="contentView" id="Syn-cv-001">
+                                                            <rect key="frame" x="0.0" y="0.0" width="507" height="160"/>
+                                                            <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                                                            <subviews>
+                                                                <box verticalHuggingPriority="750" fixedFrame="YES" boxType="separator" translatesAutoresizingMaskIntoConstraints="NO" id="Syn-sp-001">
+                                                                    <rect key="frame" x="14" y="152" width="477" height="5"/>
+                                                                    <autoresizingMask key="autoresizingMask"/>
+                                                                </box>
+                                                                <button toolTip="Share history with your other machines through a synced folder." fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Syn-cb-001">
+                                                                    <rect key="frame" x="14" y="122" width="477" height="18"/>
+                                                                    <autoresizingMask key="autoresizingMask"/>
+                                                                    <buttonCell key="cell" type="check" title="Sync history through a folder" bezelStyle="regularSquare" imagePosition="left" alignment="left" inset="2" id="Syn-cc-001">
+                                                                        <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                                                                        <font key="font" metaFont="system"/>
+                                                                    </buttonCell>
+                                                                    <connections>
+                                                                        <action selector="toggleFolderSync:" target="213" id="Syn-ca-001"/>
+                                                                        <binding destination="808" name="value" keyPath="values.syncFolderEnabled" id="Syn-cv-002"/>
+                                                                    </connections>
+                                                                </button>
+                                                                <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Syn-nt-001">
+                                                                    <rect key="frame" x="32" y="86" width="459" height="32"/>
+                                                                    <autoresizingMask key="autoresizingMask"/>
+                                                                    <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="Pick a folder that iCloud Drive, Dropbox or Syncthing keeps in sync. Every machine writes its own file there, unencrypted. Favorites sync too." id="Syn-nc-001">
+                                                                        <font key="font" metaFont="label" size="11"/>
+                                                                        <color key="textColor" name="secondaryLabelColor" catalog="System" colorSpace="catalog"/>
+                                                                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                                                                    </textFieldCell>
+                                                                </textField>
+                                                                <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Syn-pl-001">
+                                                                    <rect key="frame" x="32" y="56" width="320" height="17"/>
+                                                                    <autoresizingMask key="autoresizingMask"/>
+                                                                    <textFieldCell key="cell" lineBreakMode="truncatingMiddle" sendsActionOnEndEditing="YES" title="No folder chosen" id="Syn-pc-001">
+                                                                        <font key="font" metaFont="system"/>
+                                                                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                                                                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                                                                    </textFieldCell>
+                                                                </textField>
+                                                                <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Syn-bt-001">
+                                                                    <rect key="frame" x="354" y="47" width="140" height="32"/>
+                                                                    <autoresizingMask key="autoresizingMask"/>
+                                                                    <buttonCell key="cell" type="push" title="Choose Folder…" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="Syn-bc-001">
+                                                                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                                                                        <font key="font" metaFont="system"/>
+                                                                    </buttonCell>
+                                                                    <connections>
+                                                                        <action selector="chooseSyncFolder:" target="213" id="Syn-ba-001"/>
+                                                                    </connections>
+                                                                </button>
+                                                                <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Syn-st-001">
+                                                                    <rect key="frame" x="32" y="14" width="459" height="30"/>
+                                                                    <autoresizingMask key="autoresizingMask"/>
+                                                                    <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="Off." id="Syn-sc-001">
+                                                                        <font key="font" metaFont="label" size="11"/>
+                                                                        <color key="textColor" name="secondaryLabelColor" catalog="System" colorSpace="catalog"/>
+                                                                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                                                                    </textFieldCell>
+                                                                </textField>
+                                                            </subviews>
+                                                        </view>
                                                     </box>
-                                                    <button toolTip="Share history with your other machines through a synced folder." fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Syn-cb-001">
-                                                        <rect key="frame" x="14" y="122" width="477" height="18"/>
-                                                        <autoresizingMask key="autoresizingMask"/>
-                                                        <buttonCell key="cell" type="check" title="Sync history through a folder" bezelStyle="regularSquare" imagePosition="left" alignment="left" inset="2" id="Syn-cc-001">
-                                                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
-                                                            <font key="font" metaFont="system"/>
-                                                        </buttonCell>
-                                                        <connections>
-                                                            <action selector="toggleFolderSync:" target="213" id="Syn-ca-001"/>
-                                                            <binding destination="808" name="value" keyPath="values.syncFolderEnabled" id="Syn-cv-002"/>
-                                                        </connections>
-                                                    </button>
-                                                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Syn-nt-001">
-                                                        <rect key="frame" x="32" y="86" width="459" height="32"/>
-                                                        <autoresizingMask key="autoresizingMask"/>
-                                                        <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="Pick a folder that iCloud Drive, Dropbox or Syncthing keeps in sync. Every machine writes its own file there, unencrypted. Favorites sync too." id="Syn-nc-001">
-                                                            <font key="font" metaFont="label" size="11"/>
-                                                            <color key="textColor" name="secondaryLabelColor" catalog="System" colorSpace="catalog"/>
-                                                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
-                                                        </textFieldCell>
-                                                    </textField>
-                                                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Syn-pl-001">
-                                                        <rect key="frame" x="32" y="56" width="320" height="17"/>
-                                                        <autoresizingMask key="autoresizingMask"/>
-                                                        <textFieldCell key="cell" lineBreakMode="truncatingMiddle" sendsActionOnEndEditing="YES" title="No folder chosen" id="Syn-pc-001">
-                                                            <font key="font" metaFont="system"/>
-                                                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
-                                                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
-                                                        </textFieldCell>
-                                                    </textField>
-                                                    <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Syn-bt-001">
-                                                        <rect key="frame" x="354" y="47" width="140" height="32"/>
-                                                        <autoresizingMask key="autoresizingMask"/>
-                                                        <buttonCell key="cell" type="push" title="Choose Folder…" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="Syn-bc-001">
-                                                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
-                                                            <font key="font" metaFont="system"/>
-                                                        </buttonCell>
-                                                        <connections>
-                                                            <action selector="chooseSyncFolder:" target="213" id="Syn-ba-001"/>
-                                                        </connections>
-                                                    </button>
-                                                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Syn-st-001">
-                                                        <rect key="frame" x="32" y="14" width="459" height="30"/>
-                                                        <autoresizingMask key="autoresizingMask"/>
-                                                        <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="Off." id="Syn-sc-001">
-                                                            <font key="font" metaFont="label" size="11"/>
-                                                            <color key="textColor" name="secondaryLabelColor" catalog="System" colorSpace="catalog"/>
-                                                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
-                                                        </textFieldCell>
-                                                    </textField>
                                                 </subviews>
                                             </view>
                                         </box>
