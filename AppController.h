@@ -35,6 +35,9 @@
     NSDictionary                *pendingHistoryPaste;
     NSString                    *historyDeferredError;
     BOOL                         historyPasteInProgress;
+    BOOL                         historyPasteLookup;
+    BOOL                         historyPasteClosingPanel;
+    NSUInteger                   historyPasteGeneration;
     FlycutSyncSettingsController *syncSettingsController;
 	IBOutlet SRRecorderControl	*mainRecorder;
 	IBOutlet NSPanel			*prefsPanel;

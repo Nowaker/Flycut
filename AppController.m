@@ -1223,6 +1223,8 @@
 
 - (void)dismissHistoryForOtherWindow
 {
+    ++historyPasteGeneration;
+    historyPasteLookup = NO;
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(finishHistoryPaste) object:nil];
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(historyTargetActivationFailed) object:nil];
     [[[NSWorkspace sharedWorkspace] notificationCenter] removeObserver:self name:NSWorkspaceDidActivateApplicationNotification object:nil];
@@ -1236,7 +1238,7 @@
 
 - (IBAction)showHistoryPanel:(id)sender
 {
-    if (historyPasteInProgress) return;
+    if (historyPasteInProgress) [self dismissHistoryForOtherWindow];
     if (!historyPanel) {
         historyPanel = [[HistoryPanelController alloc] init];
         historyPanel.historyDelegate = self;
@@ -1265,7 +1267,17 @@
 
 - (void)historyPanelDidDismiss:(HistoryPanelController *)controller
 {
-    if (historyPasteInProgress) return;
+    if (historyPasteClosingPanel) return;
+    if (historyPasteInProgress) {
+        ++historyPasteGeneration;
+        historyPasteLookup = NO;
+        historyPasteInProgress = NO;
+        [pendingHistoryPaste release];
+        pendingHistoryPaste = nil;
+        [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(finishHistoryPaste) object:nil];
+        [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(historyTargetActivationFailed) object:nil];
+        [[[NSWorkspace sharedWorkspace] notificationCenter] removeObserver:self name:NSWorkspaceDidActivateApplicationNotification object:nil];
+    }
     if (historyTargetApplication && !historyTargetApplication.terminated) {
         [historyTargetApplication activateWithOptions:NSApplicationActivateIgnoringOtherApps];
     }
@@ -1275,6 +1287,7 @@
 
 - (void)historyPanel:(HistoryPanelController *)controller pasteEntry:(NSDictionary *)entry
 {
+    if (historyPasteInProgress) return;
     if (!historyTargetApplication || historyTargetApplication.terminated) {
         [historyPanel showError:@"The original app is unavailable. Close history and reopen it from the app you want to paste into."];
         return;
@@ -1285,11 +1298,12 @@
         return;
     }
     historyPasteInProgress = YES;
+    ++historyPasteGeneration;
     [pendingHistoryPaste release];
     pendingHistoryPaste = [entry copy];
     [[[NSWorkspace sharedWorkspace] notificationCenter] addObserver:self selector:@selector(historyTargetDidActivate:)
                                                              name:NSWorkspaceDidActivateApplicationNotification object:nil];
-    [historyPanel dismiss];
+    [historyPanel showLoading:@"Preparing paste..."];
     if (!historyTargetApplication.active && ![historyTargetApplication activateWithOptions:NSApplicationActivateIgnoringOtherApps]) {
         [self historyTargetActivationFailed];
         return;
@@ -1306,33 +1320,56 @@
 
 - (void)finishHistoryPaste
 {
-    if (!historyPasteInProgress || !historyTargetApplication.active) return;
-    CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStatePrivate);
-    CGEventRef down = source ? CGEventCreateKeyboardEvent(source, kVK_ANSI_V, true) : NULL;
-    CGEventRef up = source ? CGEventCreateKeyboardEvent(source, kVK_ANSI_V, false) : NULL;
-    if (!down || !up) {
-        if (down) CFRelease(down);
-        if (up) CFRelease(up);
-        if (source) CFRelease(source);
-        [self historyPasteFailed:@"Could not prepare Paste. Nothing was pasted. Try again."];
-        return;
-    }
-    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(historyTargetActivationFailed) object:nil];
-    [[[NSWorkspace sharedWorkspace] notificationCenter] removeObserver:self name:NSWorkspaceDidActivateApplicationNotification object:nil];
-    [self addClipToPasteboard:pendingHistoryPaste[@"text"]];
-    CGEventSetFlags(down, kCGEventFlagMaskCommand | 0x000008);
-    CGEventSetFlags(up, kCGEventFlagMaskCommand | 0x000008);
-    CGEventPostToPid(historyTargetApplication.processIdentifier, down);
-    CGEventPostToPid(historyTargetApplication.processIdentifier, up);
-    CFRelease(down);
-    CFRelease(up);
-    CFRelease(source);
-    [self recordHistoryPaste:pendingHistoryPaste];
-    [pendingHistoryPaste release];
-    pendingHistoryPaste = nil;
-    [historyTargetApplication release];
-    historyTargetApplication = nil;
-    historyPasteInProgress = NO;
+    if (!historyPasteInProgress || historyPasteLookup || !historyTargetApplication.active) return;
+    historyPasteLookup = YES;
+    NSUInteger generation = historyPasteGeneration;
+    NSString *itemID = pendingHistoryPaste[@"item_id"];
+    FlycutArchive *archive = [flycutOperator archive];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        NSError *error = nil;
+        NSDictionary *liveItem = [archive itemWithID:itemID error:&error];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (!historyPasteInProgress || generation != historyPasteGeneration) return;
+            historyPasteLookup = NO;
+            if (!liveItem || error) {
+                [self historyPasteFailed:error ? [NSString stringWithFormat:@"Could not prepare Paste: %@", error.localizedDescription] : @"This clipping is no longer in history. Select another result. Nothing was pasted."];
+                return;
+            }
+            if (!historyTargetApplication.active || !AXIsProcessTrusted()) {
+                [self historyPasteFailed:@"The paste target or Accessibility permission changed. Nothing was pasted. Try again."];
+                return;
+            }
+            CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStatePrivate);
+            CGEventRef down = source ? CGEventCreateKeyboardEvent(source, kVK_ANSI_V, true) : NULL;
+            CGEventRef up = source ? CGEventCreateKeyboardEvent(source, kVK_ANSI_V, false) : NULL;
+            if (!down || !up) {
+                if (down) CFRelease(down);
+                if (up) CFRelease(up);
+                if (source) CFRelease(source);
+                [self historyPasteFailed:@"Could not prepare Paste. Nothing was pasted. Try again."];
+                return;
+            }
+            [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(historyTargetActivationFailed) object:nil];
+            [[[NSWorkspace sharedWorkspace] notificationCenter] removeObserver:self name:NSWorkspaceDidActivateApplicationNotification object:nil];
+            historyPasteClosingPanel = YES;
+            [historyPanel dismiss];
+            historyPasteClosingPanel = NO;
+            [self addClipToPasteboard:liveItem[@"text"]];
+            CGEventSetFlags(down, kCGEventFlagMaskCommand | 0x000008);
+            CGEventSetFlags(up, kCGEventFlagMaskCommand | 0x000008);
+            CGEventPostToPid(historyTargetApplication.processIdentifier, down);
+            CGEventPostToPid(historyTargetApplication.processIdentifier, up);
+            CFRelease(down);
+            CFRelease(up);
+            CFRelease(source);
+            [self recordHistoryPaste:liveItem];
+            [pendingHistoryPaste release];
+            pendingHistoryPaste = nil;
+            [historyTargetApplication release];
+            historyTargetApplication = nil;
+            historyPasteInProgress = NO;
+        });
+    });
 }
 
 - (void)historyTargetActivationFailed
@@ -1343,6 +1380,8 @@
 - (void)historyPasteFailed:(NSString *)message
 {
     if (!historyPasteInProgress) return;
+    ++historyPasteGeneration;
+    historyPasteLookup = NO;
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(historyTargetActivationFailed) object:nil];
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(finishHistoryPaste) object:nil];
     [[[NSWorkspace sharedWorkspace] notificationCenter] removeObserver:self name:NSWorkspaceDidActivateApplicationNotification object:nil];
