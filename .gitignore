@@ -9,3 +9,5 @@ build/
 *.mode2v3
 xcuserdata
 xcshareddata
+tmp/
+!tmp/.keep
