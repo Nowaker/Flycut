@@ -8,13 +8,12 @@
 	  container and aps-environment keys, which require a matching provisioning
 	  profile and are invalid for Developer ID distribution.
 
-	  The CloudKit guard added in 1.9.7 means the app runs safely without the
-	  iCloud entitlement (sync simply no-ops). Accessibility (for synthesizing
+	  Developer ID releases compile with FLYCUT_CLOUDKIT=0. Accessibility (for synthesizing
 	  paste) is governed by TCC, not entitlements. Apple Events automation is
 	  kept because, under the hardened runtime, the login-item helper sends
 	  Apple Events to System Events.
 
-	  The Mac App Store build continues to use Flycut.entitlements unchanged.
+	  CloudKit opt-in builds use Build/FlycutCloudKit.entitlements instead.
 	-->
 	<key>com.apple.security.automation.apple-events</key>
 	<true/>

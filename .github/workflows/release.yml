@@ -92,7 +92,7 @@ jobs:
         # embedded framework has no root-level entitlements file and would fail).
         xcodebuild -project Flycut.xcodeproj -scheme Flycut -configuration Release \
           -archivePath build/Flycut.xcarchive archive \
-          CODE_SIGNING_ALLOWED=NO
+          CODE_SIGNING_ALLOWED=NO FLYCUT_CLOUDKIT=0
 
     - name: Export and sign app
       run: |
@@ -101,11 +101,7 @@ jobs:
         APP="build/Export/Flycut.app"
         if [ -n "$SIGNING_IDENTITY" ]; then
           # Sign inside-out with Developer ID + hardened runtime + secure timestamp.
-          # Framework: no entitlements. Helper + main app: the Developer ID (non-sandbox)
-          # entitlements. The MAS build (Flycut.entitlements) is untouched.
-          FW="$APP/Contents/Frameworks/MJCloudKitUserDefaultsSync.framework"
-          [ -d "$FW" ] && codesign --force --options runtime --timestamp \
-            --sign "$SIGNING_IDENTITY" "$FW"
+          # Helper + main app use the Developer ID (non-sandbox) entitlements.
           HELPER="$APP/Contents/Library/LoginItems/FlycutHelper.app"
           [ -d "$HELPER" ] && codesign --force --options runtime --timestamp \
             --entitlements FlycutDeveloperID.entitlements --sign "$SIGNING_IDENTITY" "$HELPER"
@@ -183,7 +179,7 @@ jobs:
           echo ""
           echo "**Upgrading and paste stopped working?** Reset the permission and re-grant it:"
           echo '```'
-          echo "tccutil reset Accessibility com.generalarcade.flycut"
+          echo "tccutil reset Accessibility net.nowaker.flycut"
           echo '```'
           echo ""
           echo "_Build: $SIGN._"
