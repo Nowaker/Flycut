@@ -24,6 +24,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.developer-tools</string>
+	<key>FlycutScissorsColor</key>
+	<string>${FLYCUT_SCISSORS_COLOR}</string>
 	<key>LSUIElement</key>
 	<string>1</string>
 	<key>NSAppleEventsUsageDescription</key>

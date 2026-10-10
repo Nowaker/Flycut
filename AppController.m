@@ -367,10 +367,9 @@
     }
     else
     {
-        [statusItem setTitle: statusItemText];
-        [statusItem setImage: statusItemImage];
         statusItemText = nil;
         statusItemImage = nil;
+        [self switchMenuIconTo:(int)[[NSUserDefaults standardUserDefaults] integerForKey:@"menuIcon"]];
     }
     return false;
 }
@@ -446,14 +445,30 @@
         [statusItem setImage:[NSImage imageNamed:@"com.generalarcade.flycut.black.16.png"]];
     } else if (number == 2 ) {
         [statusItem setImage:nil];
-        [statusItem setTitle:[NSString stringWithFormat:@"%C",0x2704]];
+        [self setStatusItemGlyph:0x2704];
     } else if ( number == 3 ) {
         [statusItem setImage:nil];
-        [statusItem setTitle:[NSString stringWithFormat:@"%C",0x2702]];
+        [self setStatusItemGlyph:0x2702];
     } else {
         [statusItem setTitle:@""];
         [statusItem setImage:[NSImage imageNamed:@"com.generalarcade.flycut.16.png"]];
     }
+}
+
+// The scissors glyphs take the build's FlycutScissorsColor (hex RGB in Info.plist), so one build of Flycut can be
+// told apart from another in the menu bar; without one they keep the menu bar's own text color.
+-(void) setStatusItemGlyph:(unichar)glyph
+{
+	NSString *title = [NSString stringWithCharacters:&glyph length:1];
+	NSString *hex = [[[NSBundle mainBundle] objectForInfoDictionaryKey:@"FlycutScissorsColor"] description];
+	unsigned int rgb = 0;
+	if ( [hex length] != 6 || ![[NSScanner scannerWithString:hex] scanHexInt:&rgb] ) {
+		[statusItem setTitle:title];
+		return;
+	}
+	NSColor *color = [NSColor colorWithSRGBRed:((rgb >> 16) & 0xFF) / 255.0 green:((rgb >> 8) & 0xFF) / 255.0 blue:(rgb & 0xFF) / 255.0 alpha:1];
+	NSDictionary *attributes = @{NSForegroundColorAttributeName: color, NSFontAttributeName: [NSFont menuBarFontOfSize:0]};
+	[[statusItem button] setAttributedTitle:[[[NSAttributedString alloc] initWithString:title attributes:attributes] autorelease]];
 }
 
 -(NSDictionary*) checkPreferencesChanges:(NSDictionary*)changes
