@@ -39,6 +39,8 @@
     BOOL                         historyPasteClosingPanel;
     NSUInteger                   historyPasteGeneration;
     FlycutSyncSettingsController *syncSettingsController;
+    NSOpenPanel                 *legacyImportPanel;
+    BOOL                         legacyPreferencesPending;
 	IBOutlet SRRecorderControl	*mainRecorder;
 	IBOutlet NSPanel			*prefsPanel;
 	IBOutlet NSTextView			*acknowledgementsView;
@@ -109,6 +111,8 @@
 -(void)hitHistoryHotKey:(SGHotKey *)hotKey;
 -(IBAction)showHistoryPanel:(id)sender;
 -(IBAction)showSyncSettings:(id)sender;
+-(IBAction)importLegacyHistory:(id)sender;
+-(IBAction)startNewArchive:(id)sender;
 
 // Bezel related
 -(void) updateBezel;

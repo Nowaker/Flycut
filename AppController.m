@@ -39,6 +39,11 @@
 - (void)historyArchiveDidChange:(NSNotification *)notification;
 - (void)historyArchiveReady:(NSNotification *)notification;
 - (void)dismissHistoryForOtherWindow;
+- (void)importLegacyPreferenceSource;
+- (void)completeLegacyPreferenceImport:(NSDictionary *)legacy;
+- (void)applyLegacyImportURL:(NSURL *)url;
+- (void)showLegacyMigrationError:(NSString *)message;
+- (void)restoreMainShortcutFromPreferences;
 + (void)importLegacyPreferences:(NSDictionary *)legacy intoDefaults:(NSUserDefaults *)defaults existingPreferences:(NSDictionary *)existing;
 @end
 
@@ -55,13 +60,8 @@
 
 - (id)init
 {
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    NSString *domain = [[NSBundle mainBundle] bundleIdentifier];
-    if ([domain isEqualToString:@"net.nowaker.flycut"] && ![defaults boolForKey:@"legacyPreferencesImported"]) {
-        [AppController importLegacyPreferences:[defaults persistentDomainForName:@"com.generalarcade.flycut"]
-                                   intoDefaults:defaults existingPreferences:[defaults persistentDomainForName:domain]];
-        [defaults setBool:YES forKey:@"legacyPreferencesImported"];
-    }
+    legacyPreferencesPending = [[[NSBundle mainBundle] bundleIdentifier] isEqualToString:@"net.nowaker.flycut"] &&
+        ![[NSUserDefaults standardUserDefaults] boolForKey:@"legacyPreferencesImported"];
 	[[NSUserDefaults standardUserDefaults] registerDefaults:[NSDictionary dictionaryWithObjectsAndKeys:
 		[NSDictionary dictionaryWithObjects:[NSArray arrayWithObjects:[NSNumber numberWithInt:9],[NSNumber numberWithLong:1179648],nil] forKeys:[NSArray arrayWithObjects:@"keyCode",@"modifierFlags",nil]],
 		@"ShortcutRecorder mainHotkey",
@@ -136,6 +136,52 @@
     }
 }
 
+- (void)importLegacyPreferenceSource
+{
+    if (![[[NSBundle mainBundle] bundleIdentifier] isEqualToString:@"net.nowaker.flycut"] ||
+        [[NSUserDefaults standardUserDefaults] boolForKey:@"legacyPreferencesImported"]) return;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        NSError *error = nil;
+        NSDictionary *legacy = [FlycutOperator legacyDefaultsForMigration:&error];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (legacy && !error) [self completeLegacyPreferenceImport:legacy];
+            else {
+                legacyPreferencesPending = NO;
+                [self restoreMainShortcutFromPreferences];
+                [self toggleMainHotKey:nil];
+            }
+        });
+    });
+}
+
+- (void)completeLegacyPreferenceImport:(NSDictionary *)legacy
+{
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *domain = [[NSBundle mainBundle] bundleIdentifier];
+    if (![domain isEqualToString:@"net.nowaker.flycut"]) return;
+    legacyPreferencesPending = NO;
+    if (![defaults boolForKey:@"legacyPreferencesImported"]) {
+        [AppController importLegacyPreferences:legacy intoDefaults:defaults existingPreferences:[defaults persistentDomainForName:domain]];
+        [defaults setBool:YES forKey:@"legacyPreferencesImported"];
+    }
+    [self restoreMainShortcutFromPreferences];
+    if (mainRecorder) [self toggleMainHotKey:nil];
+    if (flycutOperator) {
+        [self checkRememberNumPref:[defaults integerForKey:@"rememberNum"] forPrimaryStore:YES];
+        [self checkRememberNumPref:[defaults integerForKey:@"favoritesRememberNum"] forPrimaryStore:NO];
+        [self switchMenuIconTo:[defaults integerForKey:@"menuIcon"]];
+    }
+}
+
+- (void)restoreMainShortcutFromPreferences
+{
+    NSDictionary *shortcut = [[NSUserDefaults standardUserDefaults] dictionaryForKey:@"ShortcutRecorder mainHotkey"];
+    id delegate = mainRecorder.delegate;
+    mainRecorder.delegate = nil;
+    [mainRecorder setKeyCombo:SRMakeKeyCombo([shortcut[@"keyCode"] intValue], [shortcut[@"modifierFlags"] unsignedIntegerValue])];
+    mainRecorder.delegate = delegate;
+}
+
 - (void)registerOrDeregisterICloudSync
 {
 	[flycutOperator registerOrDeregisterICloudSync];
@@ -172,12 +218,7 @@
 {
 	[self buildAppearancesPreferencePanel];
 
-	// We no longer get autosave from ShortcutRecorder, so let's set the recorder by hand
-	if ( [[NSUserDefaults standardUserDefaults] dictionaryForKey:@"ShortcutRecorder mainHotkey"] ) {
-		[mainRecorder setKeyCombo:SRMakeKeyCombo([[[[NSUserDefaults standardUserDefaults] dictionaryForKey:@"ShortcutRecorder mainHotkey"] objectForKey:@"keyCode"] intValue],
-												 [[[[NSUserDefaults standardUserDefaults] dictionaryForKey:@"ShortcutRecorder mainHotkey"] objectForKey:@"modifierFlags"] intValue] )
-		];
-	};
+    [self restoreMainShortcutFromPreferences];
 
 	// Initialize the FlycutOperator
 	flycutOperator = [[FlycutOperator alloc] init];
@@ -221,6 +262,13 @@
     NSMenuItem *syncItem = [[[NSMenuItem alloc] initWithTitle:@"Sync Settings..." action:@selector(showSyncSettings:) keyEquivalent:@""] autorelease];
     syncItem.target = self;
     [jcMenu insertItem:syncItem atIndex:historyMenuIndex >= 0 ? historyMenuIndex + 1 : jcMenu.numberOfItems];
+    NSMenuItem *importItem = [[[NSMenuItem alloc] initWithTitle:@"Import Legacy History..." action:@selector(importLegacyHistory:) keyEquivalent:@""] autorelease];
+    importItem.target = self;
+    [jcMenu insertItem:importItem atIndex:historyMenuIndex >= 0 ? historyMenuIndex + 2 : jcMenu.numberOfItems];
+    NSMenuItem *newArchiveItem = [[[NSMenuItem alloc] initWithTitle:@"Start New Archive..." action:@selector(startNewArchive:) keyEquivalent:@""] autorelease];
+    newArchiveItem.target = self;
+    newArchiveItem.hidden = YES;
+    [jcMenu insertItem:newArchiveItem atIndex:historyMenuIndex >= 0 ? historyMenuIndex + 3 : jcMenu.numberOfItems];
     jcMenuBaseItemsCount = [[[[jcMenu itemArray] reverseObjectEnumerator] allObjects] count];
     [statusItem setEnabled:YES];
 
@@ -1049,6 +1097,7 @@
 	[self toggleMainHotKey:[NSNull null]];
     [self buildHistoryPreferences];
     [self toggleHistoryHotKey];
+    [self importLegacyPreferenceSource];
 }
 
 - (void) updateBezel
@@ -1164,11 +1213,83 @@
 
 - (void)historyArchiveReady:(NSNotification *)notification
 {
+    FlycutArchive *archive = [flycutOperator archive];
+    NSInteger newArchiveIndex = [jcMenu indexOfItemWithTarget:self andAction:@selector(startNewArchive:)];
+    if (newArchiveIndex >= 0) [jcMenu itemAtIndex:newArchiveIndex].hidden = [flycutOperator archiveError] == nil;
+    if (archive && [[[NSBundle mainBundle] bundleIdentifier] isEqualToString:@"net.nowaker.flycut"] &&
+        ![[NSUserDefaults standardUserDefaults] boolForKey:@"legacyPreferencesImported"]) {
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+            NSError *error = nil;
+            NSDictionary *legacy = [archive legacyDefaultsBackup:&error];
+            if (legacy && !error) dispatch_async(dispatch_get_main_queue(), ^{ [self completeLegacyPreferenceImport:legacy]; });
+        });
+    }
     if (historyPanel) {
         [self configureHistoryProvider];
         if ([flycutOperator archiveError]) [historyPanel showError:[NSString stringWithFormat:@"History unavailable: %@", [flycutOperator archiveError].localizedDescription]];
-        else [historyPanel refresh];
+        else if (archive) [historyPanel refresh];
+        else [historyPanel showLoading:@"Opening saved history..."];
     }
+}
+
+- (IBAction)importLegacyHistory:(id)sender
+{
+    if (legacyImportPanel || ![flycutOperator archiveError]) return;
+    [self dismissHistoryForOtherWindow];
+    [NSApp activateIgnoringOtherApps:YES];
+    legacyImportPanel = [[NSOpenPanel openPanel] retain];
+    legacyImportPanel.title = @"Import Legacy History";
+    legacyImportPanel.message = @"Choose the original Flycut preferences plist. Its full history will be imported without changing the original file.";
+    legacyImportPanel.allowedFileTypes = @[@"plist"];
+    legacyImportPanel.canChooseDirectories = NO;
+    legacyImportPanel.canChooseFiles = YES;
+    legacyImportPanel.allowsMultipleSelection = NO;
+    legacyImportPanel.canCreateDirectories = NO;
+    [legacyImportPanel beginWithCompletionHandler:^(NSModalResponse response) {
+        NSURL *url = response == NSModalResponseOK ? [[legacyImportPanel.URLs firstObject] retain] : nil;
+        [legacyImportPanel release];
+        legacyImportPanel = nil;
+        if (url) [self applyLegacyImportURL:url];
+        [url release];
+    }];
+}
+
+- (void)applyLegacyImportURL:(NSURL *)url
+{
+    if (![flycutOperator importLegacyDefaultsFromURL:url]) {
+        [self showLegacyMigrationError:@"History is already opening or available. No new import was started."];
+    } else {
+        [self showHistoryPanel:nil];
+        [historyPanel showLoading:@"Importing legacy history..."];
+    }
+}
+
+- (IBAction)startNewArchive:(id)sender
+{
+    if (legacyImportPanel || ![flycutOperator archiveError]) return;
+    [self dismissHistoryForOtherWindow];
+    [NSApp activateIgnoringOtherApps:YES];
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    alert.messageText = @"Start a New Archive?";
+    alert.informativeText = @"Original Flycut history will not be deleted, but this archive will not automatically import it later. New captured text will be saved to the new local archive.";
+    [alert addButtonWithTitle:@"Cancel"];
+    [alert addButtonWithTitle:@"Start New Archive"];
+    if ([alert runModal] != NSAlertSecondButtonReturn) return;
+    if (![flycutOperator startArchiveWithoutLegacyImport]) {
+        [self showLegacyMigrationError:@"History is already opening or available. No new archive was started."];
+    } else {
+        [self showHistoryPanel:nil];
+        [historyPanel showLoading:@"Opening new archive..."];
+    }
+}
+
+- (void)showLegacyMigrationError:(NSString *)message
+{
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    alert.messageText = @"History import was not started";
+    alert.informativeText = message;
+    [alert addButtonWithTitle:@"Dismiss"];
+    [alert runModal];
 }
 
 - (IBAction)showSyncSettings:(id)sender
@@ -1186,6 +1307,11 @@
 
 - (BOOL)validateMenuItem:(NSMenuItem *)item
 {
+    if (item.action == @selector(importLegacyHistory:) || item.action == @selector(startNewArchive:)) {
+        BOOL blocked = [flycutOperator archiveError] != nil;
+        if (item.action == @selector(startNewArchive:)) item.hidden = !blocked;
+        return blocked && legacyImportPanel == nil;
+    }
     if (item.action == @selector(showSyncSettings:)) {
         BOOL ready = [flycutOperator syncController] != nil;
         item.title = ready ? @"Sync Settings..." : ([flycutOperator archiveError] ? @"Sync Settings (History Unavailable)" : @"Sync Settings (Opening History...)");
@@ -1426,6 +1552,16 @@
                 button.hidden = YES;
             }
         }
+        if ([view isKindOfClass:[NSPopUpButton class]] && [(NSPopUpButton *)view action] == @selector(setSavePreference:)) {
+            NSPopUpButton *saveChoice = (NSPopUpButton *)view;
+            [saveChoice unbind:NSSelectedIndexBinding];
+            saveChoice.target = nil;
+            saveChoice.action = NULL;
+            [saveChoice removeAllItems];
+            [saveChoice addItemWithTitle:@"Always (local archive)"];
+            saveChoice.enabled = NO;
+            saveChoice.toolTip = @"Every captured text is saved locally. Pause Capture stops new collection; Clear History deletes currently known nonfavorite items.";
+        }
         if ([view isKindOfClass:[NSTextField class]] && [[(NSTextField *)view stringValue] isEqualToString:@"iCloud Sync:"]) view.hidden = YES;
         if ([view isKindOfClass:[NSTextField class]] && [[[(NSTextField *)view stringValue] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] isEqualToString:@"Remember"]) {
             [(NSTextField *)view setStringValue:@"Recent"];
@@ -1483,6 +1619,7 @@
 
 - (IBAction)toggleMainHotKey:(id)sender
 {
+    if (legacyPreferencesPending || !mainRecorder) return;
 	if (mainHotKey != nil)
 	{
 		[[SGHotKeyCenter sharedCenter] unregisterHotKey:mainHotKey];
@@ -1867,6 +2004,7 @@
     [historyTargetApplication release];
     [pendingHistoryPaste release];
     [historyDeferredError release];
+    [legacyImportPanel release];
 	[bezel release];
 	[srTransformer release];
 	[super dealloc];
