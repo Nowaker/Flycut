@@ -113,6 +113,7 @@
 -(IBAction) showPreferencePanel:(id)sender;
 -(IBAction) setRememberNumPref:(id)sender;
 -(IBAction) setFavoritesRememberNumPref:(id)sender;
+-(IBAction) setHistoryRetentionPref:(id)sender;
 -(IBAction) setDisplayNumPref:(id)sender;
 -(IBAction) setBezelAlpha:(id)sender;
 -(IBAction) setBezelHeight:(id)sender;

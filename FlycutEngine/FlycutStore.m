@@ -106,9 +106,13 @@
 -(void) insertClipping:(FlycutClipping*) clipping atIndex:(int) index{
 	[self delegateBeginUpdates];
 
+	NSMutableArray *removedClippings = [NSMutableArray array];
 	int moveFromIndex = -1;
 	if ([jcList containsObject:clipping] && [self removeDuplicates]) {
 		moveFromIndex = (int)[jcList indexOfObject:clipping];
+		[removedClippings addObjectsFromArray:[jcList objectsAtIndexes:[jcList indexesOfObjectsPassingTest:^BOOL(id obj, NSUInteger idx, BOOL *stop) {
+			return [obj isEqual:clipping];
+		}]]];
         [jcList removeObject:clipping];
     }
 
@@ -122,6 +126,7 @@
 		index = [jcList count];
 		[jcList addObject:clipping];
 	}
+	[self assignRankToClippingAtIndex:index];
 	if ( moveFromIndex >= 0 )
 		[self delegateMoveClippingAtIndex:moveFromIndex toIndex:index];
 	else
@@ -130,10 +135,78 @@
 	// Delete clippings older than jcRememberNum
 	while ( [jcList count] > jcRememberNum ) {
 		[self delegateWillDeleteClippingAtIndex:jcRememberNum];
+		[removedClippings addObject:[jcList objectAtIndex:jcRememberNum]];
 		[jcList removeObjectAtIndex:jcRememberNum];
 		[self delegateDeleteClippingAtIndex:(jcRememberNum-1)]; // -1 for before-add indexing
 	}
 
+	[self persistRemovedClippings:removedClippings];
+	[self.persistence store:self didSaveClipping:clipping];
+
+	[self delegateEndUpdates];
+}
+
+// Ranks order a persisted list without renumbering it: a clipping placed between two others takes the midpoint of their ranks.
+-(void) assignRankToClippingAtIndex:(int)index
+{
+	FlycutClipping *clipping = [jcList objectAtIndex:index];
+	BOOL hasNewer = index > 0;
+	BOOL hasOlder = index + 1 < [jcList count];
+	double newerRank = hasNewer ? [[jcList objectAtIndex:index - 1] rank] : 0;
+	double olderRank = hasOlder ? [[jcList objectAtIndex:index + 1] rank] : 0;
+
+	if ( hasNewer && hasOlder )
+		[clipping setRank:(newerRank + olderRank) / 2];
+	else if ( hasNewer )
+		[clipping setRank:newerRank - 1];
+	else
+		[clipping setRank:olderRank + 1];
+}
+
+-(void) persistRemovedClippings:(NSArray *)clippings
+{
+	if ( [clippings count] > 0 )
+		[self.persistence store:self didRemoveClippings:clippings];
+}
+
+-(NSArray *) allClippings
+{
+	return [[jcList copy] autorelease];
+}
+
+-(void) loadPersistedClippings:(NSArray *)clippings
+{
+	[self delegateBeginUpdates];
+	for ( int i = (int)[jcList count] ; i > 0 ; i-- )
+		[self delegateDeleteClippingAtIndex:(i-1)];
+	[jcList setArray:clippings];
+	for ( FlycutClipping *aClipping in jcList )
+		[aClipping setDisplayLength:jcDisplayLen];
+	if ( self.delegate && [self.delegate respondsToSelector:@selector(insertClippingAtIndex:)] )
+		for ( int i = 0 ; i < [jcList count] ; i++ )
+			[self.delegate insertClippingAtIndex:i];
+	[self delegateEndUpdates];
+
+	[self setRememberNum:jcRememberNum];
+	[self clearModifiedSinceLastSaveStore];
+}
+
+-(void) removeClippingsOlderThan:(NSInteger)cutoffTimestamp
+{
+	NSMutableArray *removedClippings = [NSMutableArray array];
+	[self delegateBeginUpdates];
+	for ( int i = (int)[jcList count] - 1 ; i >= 0 ; i-- )
+	{
+		FlycutClipping *clipping = [jcList objectAtIndex:i];
+		if ( [clipping timestamp] > 0 && [clipping timestamp] < cutoffTimestamp )
+		{
+			[self delegateWillDeleteClippingAtIndex:i];
+			[removedClippings addObject:clipping];
+			[jcList removeObjectAtIndex:i];
+			[self delegateDeleteClippingAtIndex:i];
+		}
+	}
+	[self persistRemovedClippings:removedClippings];
 	[self delegateEndUpdates];
 }
 
@@ -156,6 +229,7 @@
     emptyJCList = [[NSMutableArray alloc] init];
     [jcList release];
     jcList = emptyJCList;
+    [self.persistence storeDidClear:self];
 
     [self delegateEndUpdates];
 }
@@ -170,8 +244,11 @@
     [self delegateBeginUpdates];
 
 	[self delegateWillDeleteClippingAtIndex:index];
+	FlycutClipping *removedClipping = [[jcList objectAtIndex:index] retain];
     [jcList removeObjectAtIndex:index];
     [self delegateDeleteClippingAtIndex:index];
+	[self persistRemovedClippings:@[removedClipping]];
+	[removedClipping release];
 
     [self delegateEndUpdates];
 }
@@ -188,7 +265,9 @@
 	FlycutClipping *clipping = [jcList objectAtIndex:index];
 	[jcList insertObject:clipping atIndex:toIndex];
 	[jcList removeObjectAtIndex:index+1];
+	[self assignRankToClippingAtIndex:toIndex];
 	[self delegateMoveClippingAtIndex:index toIndex:toIndex];
+	[self.persistence store:self didSaveClipping:clipping];
 
 	[self delegateEndUpdates];
 }
@@ -202,11 +281,14 @@
 		if ( [jcList count] > jcRememberNum ) {
 			[self delegateBeginUpdates];
 
+			NSMutableArray *removedClippings = [NSMutableArray array];
 			while ( [jcList count] > jcRememberNum ) {
 				[self delegateWillDeleteClippingAtIndex:jcRememberNum];
+				[removedClippings addObject:[jcList objectAtIndex:jcRememberNum]];
 				[jcList removeObjectAtIndex:jcRememberNum];
 				[self delegateDeleteClippingAtIndex:jcRememberNum];
 			}
+			[self persistRemovedClippings:removedClippings];
 			[self delegateEndUpdates];
 		}
     }
@@ -360,11 +442,11 @@
 
     // If we have a search, do that.  Pretty much a mix of the other two paths below, but separated out to avoid extra processing.
     if (nil != search && search.length > 0) {
-        subArray = [jcList copy];
+        subArray = [[jcList copy] autorelease];
         enumerator = [subArray objectEnumerator];
         int index = 0;
         while ( aClipping = [enumerator nextObject] ) { // Forward enumerator so we find the most recent N matches
-            if ([[self clippingContentsAtPosition:index] rangeOfString:search options:NSCaseInsensitiveSearch].location != NSNotFound) {
+            if ([[aClipping contents] rangeOfString:search options:NSCaseInsensitiveSearch].location != NSNotFound) {
                 [returnArray insertObject:[aClipping displayString] atIndex:0];
                 howMany--;
                 if (0 == howMany)
@@ -398,11 +480,11 @@
 
     // If we have a search, do that.
     if (nil != search && search.length > 0) {
-        subArray = [jcList copy];
+        subArray = [[jcList copy] autorelease];
         enumerator = [subArray objectEnumerator];
         int index = 0;
         while ( aClipping = [enumerator nextObject] ) { // Forward enumerator so we find the most recent N matches
-            if ([[self clippingContentsAtPosition:index] rangeOfString:search options:NSCaseInsensitiveSearch].location != NSNotFound) {
+            if ([[aClipping contents] rangeOfString:search options:NSCaseInsensitiveSearch].location != NSNotFound) {
                 [returnArray addObject:[NSNumber numberWithInt:index]];
                 howMany--;
                 if (0 == howMany)
@@ -431,11 +513,17 @@
 		[self.delegate endUpdates];
 }
 
+// The journals only feed iCloud merges, so an unlimited history must not grow them without bound.
+-(NSUInteger) journalCapacity
+{
+	return MIN( jcRememberNum, 1000 );
+}
+
 -(void) delegateInsertClippingAtIndex:(int)index
 {
 	[insertionJournal insertObject:[jcList objectAtIndex:index] atIndex:0];
-	if ( [insertionJournal count] > jcRememberNum )
-		[self clearInsertionJournalCount:( [insertionJournal count] - jcRememberNum )];
+	if ( [insertionJournal count] > [self journalCapacity] )
+		[self clearInsertionJournalCount:( [insertionJournal count] - [self journalCapacity] )];
 
 	modifiedSinceLastSaveStore = YES;
 	if ( self.delegate && [self.delegate respondsToSelector:@selector(insertClippingAtIndex:)] )
@@ -445,8 +533,8 @@
 -(void) delegateWillDeleteClippingAtIndex:(int)index
 {
 	[deletionJournal insertObject:[jcList objectAtIndex:index] atIndex:0];
-	if ( [deletionJournal count] > jcRememberNum )
-		[self clearDeletionJournalCount:( [deletionJournal count] - jcRememberNum )];
+	if ( [deletionJournal count] > [self journalCapacity] )
+		[self clearDeletionJournalCount:( [deletionJournal count] - [self journalCapacity] )];
 
 	if ( self.deleteDelegate && [self.deleteDelegate respondsToSelector:@selector(willDeleteClippingFromStore:AtIndex:)] )
 		[self.deleteDelegate willDeleteClippingFromStore:self AtIndex:index];

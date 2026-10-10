@@ -150,6 +150,8 @@ Tab identifier  -	Image file name and toolbar item identifier.
     
     // Attach the toolbar to the document window 
     [[tabView window] setToolbar: toolbar];
+	if ( @available(macOS 11.0, *) )
+		[[tabView window] setToolbarStyle: NSWindowToolbarStylePreference];
 	
 	// Set up window title:
 	currPage = [tabView selectedTabViewItem];
@@ -219,7 +221,13 @@ of tabs for the specified identifier.
 		
 		// Set up a reasonable tooltip, and image   Note, these aren't localized, but you will likely want to localize many of the item's properties 
 		[toolbarItem setToolTip: itemLabel];
-		[toolbarItem setImage: [NSImage imageNamed:itemIdent]];
+		NSImage *itemImage = [NSImage imageNamed:itemIdent];
+		// An identifier that isn't a bundled image is an SF Symbol name.
+		if ( nil == itemImage ) {
+			if ( @available(macOS 11.0, *) )
+				itemImage = [NSImage imageWithSystemSymbolName:itemIdent accessibilityDescription:itemLabel];
+		}
+		[toolbarItem setImage: itemImage];
 		
 		// Tell the item what message to send when it is clicked 
 		[toolbarItem setTarget: self];

@@ -275,6 +275,11 @@
                                                             <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
                                                         </textFieldCell>
                                                         <connections>
+                                                            <binding destination="808" name="enabled" keyPath="values.rememberUnlimited" id="Hst-en-001">
+                                                                <dictionary key="options">
+                                                                    <string key="NSValueTransformerName">NSNegateBoolean</string>
+                                                                </dictionary>
+                                                            </binding>
                                                             <binding destination="808" name="value" keyPath="values.rememberNum" id="826"/>
                                                         </connections>
                                                     </textField>
@@ -282,6 +287,11 @@
                                                         <rect key="frame" x="113" y="320" width="19" height="28"/>
                                                         <stepperCell key="cell" continuous="YES" alignment="left" minValue="10" maxValue="999" doubleValue="10" valueWraps="YES" id="760"/>
                                                         <connections>
+                                                            <binding destination="808" name="enabled" keyPath="values.rememberUnlimited" id="Hst-en-002">
+                                                                <dictionary key="options">
+                                                                    <string key="NSValueTransformerName">NSNegateBoolean</string>
+                                                                </dictionary>
+                                                            </binding>
                                                             <action selector="setRememberNumPref:" target="213" id="485"/>
                                                             <binding destination="808" name="value" keyPath="values.rememberNum" id="829"/>
                                                         </connections>
@@ -626,6 +636,92 @@
                                         <constraint firstItem="387" firstAttribute="leading" secondItem="360" secondAttribute="leading" id="zUp-0A-XJv"/>
                                         <constraint firstAttribute="bottom" secondItem="387" secondAttribute="bottom" id="zmW-H9-0um"/>
                                     </constraints>
+                                </view>
+                            </tabViewItem>
+                            <tabViewItem label="History" identifier="clock.arrow.circlepath" id="Hst-tb-001">
+                                <view key="view" id="Hst-vw-001">
+                                    <rect key="frame" x="0.0" y="0.0" width="507" height="520"/>
+                                    <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                                    <subviews>
+                                        <box fixedFrame="YES" boxType="oldStyle" borderType="none" title="Box" titlePosition="noTitle" translatesAutoresizingMaskIntoConstraints="NO" id="Hst-bx-001">
+                                            <rect key="frame" x="0.0" y="370" width="507" height="150"/>
+                                            <autoresizingMask key="autoresizingMask"/>
+                                            <view key="contentView" id="Hst-cv-001">
+                                                <rect key="frame" x="0.0" y="0.0" width="507" height="150"/>
+                                                <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                                                <subviews>
+                                                    <button toolTip="Keep every clipping instead of only the most recent ones." fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hst-ul-001">
+                                                        <rect key="frame" x="14" y="114" width="477" height="18"/>
+                                                        <autoresizingMask key="autoresizingMask"/>
+                                                        <buttonCell key="cell" type="check" title="Keep unlimited history" bezelStyle="regularSquare" imagePosition="left" alignment="left" inset="2" id="Hst-uc-001">
+                                                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                                                            <font key="font" metaFont="system"/>
+                                                        </buttonCell>
+                                                        <connections>
+                                                            <action selector="setHistoryRetentionPref:" target="213" id="Hst-ua-001"/>
+                                                            <binding destination="808" name="value" keyPath="values.rememberUnlimited" id="Hst-ub-001"/>
+                                                        </connections>
+                                                    </button>
+                                                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hst-un-001">
+                                                        <rect key="frame" x="32" y="94" width="459" height="16"/>
+                                                        <autoresizingMask key="autoresizingMask"/>
+                                                        <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="When off, the Remember count on the General tab limits the history." id="Hst-uo-001">
+                                                            <font key="font" metaFont="label" size="11"/>
+                                                            <color key="textColor" name="secondaryLabelColor" catalog="System" colorSpace="catalog"/>
+                                                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                                                        </textFieldCell>
+                                                    </textField>
+                                                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hst-al-001">
+                                                        <rect key="frame" x="14" y="58" width="172" height="17"/>
+                                                        <autoresizingMask key="autoresizingMask"/>
+                                                        <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="Delete clippings older than" id="Hst-ac-001">
+                                                            <font key="font" metaFont="system"/>
+                                                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                                                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                                                        </textFieldCell>
+                                                    </textField>
+                                                    <textField toolTip="Clippings older than this many days are deleted. 0 keeps them forever." verticalHuggingPriority="750" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hst-af-001">
+                                                        <rect key="frame" x="190" y="56" width="60" height="21"/>
+                                                        <autoresizingMask key="autoresizingMask"/>
+                                                        <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" state="on" borderStyle="bezel" alignment="right" drawsBackground="YES" id="Hst-ag-001">
+                                                            <numberFormatter key="formatter" formatterBehavior="10_0" positiveFormat="#" negativeFormat="-#" hasThousandSeparators="NO" thousandSeparator="," id="Hst-ah-001">
+                                                                <attributedString key="attributedStringForZero">
+                                                                    <fragment content="0"/>
+                                                                </attributedString>
+                                                                <decimal key="minimum" value="0"/>
+                                                                <decimal key="maximum" value="NaN"/>
+                                                            </numberFormatter>
+                                                            <font key="font" metaFont="system"/>
+                                                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                                                            <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                                                        </textFieldCell>
+                                                        <connections>
+                                                            <action selector="setHistoryRetentionPref:" target="213" id="Hst-ai-001"/>
+                                                            <binding destination="808" name="value" keyPath="values.historyMaxAgeDays" id="Hst-aj-001"/>
+                                                        </connections>
+                                                    </textField>
+                                                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hst-ad-001">
+                                                        <rect key="frame" x="254" y="58" width="60" height="17"/>
+                                                        <autoresizingMask key="autoresizingMask"/>
+                                                        <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="days" id="Hst-ae-001">
+                                                            <font key="font" metaFont="system"/>
+                                                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                                                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                                                        </textFieldCell>
+                                                    </textField>
+                                                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hst-an-001">
+                                                        <rect key="frame" x="14" y="34" width="477" height="16"/>
+                                                        <autoresizingMask key="autoresizingMask"/>
+                                                        <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="0 keeps clippings forever. Favorites are never deleted by age." id="Hst-ao-001">
+                                                            <font key="font" metaFont="label" size="11"/>
+                                                            <color key="textColor" name="secondaryLabelColor" catalog="System" colorSpace="catalog"/>
+                                                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                                                        </textFieldCell>
+                                                    </textField>
+                                                </subviews>
+                                            </view>
+                                        </box>
+                                    </subviews>
                                 </view>
                             </tabViewItem>
                             <tabViewItem label="Hotkeys" identifier="net.sf.jumpcut.preferences.hotkey.tiff" id="346">

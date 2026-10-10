@@ -17,6 +17,8 @@
 
 #import "FlycutStore.h"
 
+@class FlycutHistoryDB;
+
 @protocol FlycutOperatorDelegate <NSObject>
 @optional
 - (NSString*)alertWithMessageText:(NSString*)message informationText:(NSString*)information buttonsTexts:(NSArray*)buttons;
@@ -30,6 +32,9 @@
     FlycutStore				*clippingStore;
     FlycutStore				*favoritesStore;
     FlycutStore				*stashedStore;
+
+	FlycutHistoryDB			*historyDB;
+	NSTimer					*expiryTimer;
 
 	SEL saveSelector;
 	NSObject* saveTarget;
@@ -82,6 +87,8 @@
 // Preference related
 -(void) willShowPreferences;
 -(int) setRememberNum:(int)newRemember forPrimaryStore:(BOOL) isPrimaryStore;
+-(void) savePreferenceDidChange;
+-(void) pruneExpiredClippings;
 
 // Initialization / cleanup related
 -(void)applicationWillTerminate;;

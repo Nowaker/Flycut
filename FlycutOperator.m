@@ -18,6 +18,7 @@
 
 #ifdef FLYCUT_MAC
 #import "AppController.h"
+#import "FlycutHistoryDB.h"
 #endif
 
 @implementation FlycutOperator {
@@ -30,6 +31,10 @@
 	[[NSUserDefaults standardUserDefaults] registerDefaults:[NSDictionary dictionaryWithObjectsAndKeys:
 		[NSNumber numberWithInt:40],
 		@"rememberNum",
+		[NSNumber numberWithBool:YES],
+		@"rememberUnlimited",
+		[NSNumber numberWithInt:0],
+		@"historyMaxAgeDays",
         [NSNumber numberWithInt:40],
         @"favoritesRememberNum",
 		[NSNumber numberWithInt:1],
@@ -59,6 +64,8 @@
         nil]];
 
 	settingsSyncList = @[@"rememberNum",
+						 @"rememberUnlimited",
+						 @"historyMaxAgeDays",
 						 @"favoritesRememberNum",
 						 @"savePreference",
 						 @"skipPasswordFields",
@@ -87,6 +94,47 @@
 	stackPosition = favoritesStackPosition = stashedStackPosition = 0;
 
 	[self registerOrDeregisterICloudSync];
+
+	[self pruneExpiredClippings];
+	expiryTimer = [[NSTimer scheduledTimerWithTimeInterval:3600
+													 target:self
+												   selector:@selector(expiryTimerFired:)
+												   userInfo:nil
+													repeats:YES] retain];
+}
+
+-(void) expiryTimerFired:(NSTimer *)timer
+{
+	[self pruneExpiredClippings];
+}
+
+-(FlycutStore*) primaryStore
+{
+	return NULL != stashedStore ? stashedStore : clippingStore;
+}
+
+-(int) rememberNumSettingForPrimaryStore:(BOOL)isPrimaryStore
+{
+	if ( isPrimaryStore && [[NSUserDefaults standardUserDefaults] boolForKey:@"rememberUnlimited"] )
+		return INT_MAX;
+	return (int)[[NSUserDefaults standardUserDefaults] integerForKey:isPrimaryStore ? @"rememberNum" : @"favoritesRememberNum"];
+}
+
+-(void) pruneExpiredClippings
+{
+	NSInteger maxAgeDays = [[NSUserDefaults standardUserDefaults] integerForKey:@"historyMaxAgeDays"];
+	if ( maxAgeDays <= 0 )
+		return;
+
+	NSInteger cutoff = (NSInteger)[[NSDate date] timeIntervalSince1970] - maxAgeDays * 24 * 60 * 60;
+	[[self primaryStore] removeClippingsOlderThan:cutoff];
+	[self adjustStackPositionIfOutOfBounds];
+	[self actionAfterListModification];
+}
+
+-(BOOL) cloudKitClippingSyncEnabled
+{
+	return FLYCUT_CLOUDKIT_ENABLED && [[NSUserDefaults standardUserDefaults] boolForKey:@"syncClippingsViaICloud"];
 }
 
 -(FlycutStore*) allocInitFlycutStoreRemembering:(int) remembering
@@ -101,8 +149,9 @@
 	// Fixme - These stores are not released anywhere.
 	if ( !clippingStore )
 	{
-		clippingStore = [self allocInitFlycutStoreRemembering:[[NSUserDefaults standardUserDefaults] integerForKey:@"rememberNum"]];
+		clippingStore = [self allocInitFlycutStoreRemembering:[self rememberNumSettingForPrimaryStore:YES]];
 		clippingStore.deleteDelegate = self;
+		clippingStore.persistenceListId = FlycutHistoryListClippings;
 	}
 	else
 	{
@@ -112,8 +161,9 @@
 
 	if ( ! favoritesStore )
 	{
-		favoritesStore = [self allocInitFlycutStoreRemembering:[[NSUserDefaults standardUserDefaults] integerForKey:@"favoritesRememberNum"]];
+		favoritesStore = [self allocInitFlycutStoreRemembering:[self rememberNumSettingForPrimaryStore:NO]];
 		favoritesStore.deleteDelegate = self;
+		favoritesStore.persistenceListId = FlycutHistoryListFavorites;
 	}
 	else
 	{
@@ -128,11 +178,160 @@
 {
 	[self initializeStores];
 
+#ifdef FLYCUT_MAC
+	historyDB = [[FlycutHistoryDB alloc] initWithPath:[FlycutHistoryDB defaultPath]];
+	if ( historyDB ) {
+		if ( [[NSUserDefaults standardUserDefaults] integerForKey:@"savePreference"] >= 1 ) {
+			[self importLegacyHistory];
+			[self attachHistoryDB];
+			[clippingStore loadPersistedClippings:[historyDB clippingsInList:FlycutHistoryListClippings withDisplayLength:displayLength]];
+			[favoritesStore loadPersistedClippings:[historyDB clippingsInList:FlycutHistoryListFavorites withDisplayLength:displayLength]];
+		}
+		return;
+	}
+#endif
+
 	// If our preferences indicate that we are saving, load the dictionary from the saved plist
 	// and use it to get everything set up.
 	if ( [[NSUserDefaults standardUserDefaults] integerForKey:@"savePreference"] >= 1 ) {
 		[self loadEngineFromPList];
 	}
+}
+
+#ifdef FLYCUT_MAC
+-(void) attachHistoryDB
+{
+	clippingStore.persistence = historyDB;
+	favoritesStore.persistence = historyDB;
+}
+
+-(void) detachHistoryDB
+{
+	clippingStore.persistence = nil;
+	favoritesStore.persistence = nil;
+}
+
+// History saved by earlier Flycut versions: this build's own preferences, then the Mac App Store
+// and direct-download builds of upstream Flycut. Each is imported once; a file that exists but
+// can't be read yet (macOS asks before an app reads another app's container) is retried next launch.
+-(void) importLegacyHistory
+{
+	NSString *upstreamId = @"com.generalarcade.flycut";
+	NSString *upstreamPlistName = [upstreamId stringByAppendingPathExtension:@"plist"];
+	NSString *appStorePlist = [[[[NSHomeDirectory() stringByAppendingPathComponent:@"Library/Containers"]
+								 stringByAppendingPathComponent:upstreamId]
+								stringByAppendingPathComponent:@"Data/Library/Preferences"]
+							   stringByAppendingPathComponent:upstreamPlistName];
+	NSString *directDownloadPlist = [[NSHomeDirectory() stringByAppendingPathComponent:@"Library/Preferences"]
+									 stringByAppendingPathComponent:upstreamPlistName];
+
+	[self importLegacyStore:[[NSUserDefaults standardUserDefaults] dictionaryForKey:@"store"] named:@"preferences"];
+	for ( NSString *plistPath in @[appStorePlist, directDownloadPlist] ) {
+		if ( ![[NSFileManager defaultManager] fileExistsAtPath:plistPath] )
+			continue;
+		NSDictionary *preferences = [NSDictionary dictionaryWithContentsOfFile:plistPath];
+		if ( nil == preferences ) {
+			NSLog(@"Flycut: could not read %@ to import its history; will retry next launch", plistPath);
+			continue;
+		}
+		[self importLegacySettings:preferences named:plistPath];
+		[self importLegacyStore:[preferences objectForKey:@"store"] named:plistPath];
+	}
+}
+
+// Carries over Flycut's own settings, but never ones this build already has, and never iCloud sync state.
+-(void) importLegacySettings:(NSDictionary *)preferences named:(NSString *)sourceName
+{
+	NSString *importedKey = [@"imported-settings:" stringByAppendingString:sourceName];
+	if ( nil != [historyDB metaValueForKey:importedKey] )
+		return;
+
+	NSArray *settingKeys = @[@"ShortcutRecorder mainHotkey", @"rememberNum", @"favoritesRememberNum", @"displayNum", @"displayLen",
+							 @"savePreference", @"removeDuplicates", @"pasteMovesToTop", @"menuIcon", @"menuSelectionPastes",
+							 @"stickyBezel", @"wraparoundBezel", @"bezelAlpha", @"bezelWidth", @"bezelHeight", @"displayClippingSource",
+							 @"skipPasswordFields", @"skipPboardTypes", @"skipPboardTypesList", @"skipPasswordLengths",
+							 @"skipPasswordLengthsList", @"revealPasteboardTypes", @"saveForgottenClippings", @"saveForgottenFavorites"];
+	NSDictionary *ownSettings = [[NSUserDefaults standardUserDefaults] persistentDomainForName:[[NSBundle mainBundle] bundleIdentifier]];
+	for ( NSString *key in settingKeys ) {
+		id value = [preferences objectForKey:key];
+		if ( nil != value && nil == [ownSettings objectForKey:key] )
+			[[NSUserDefaults standardUserDefaults] setObject:value forKey:key];
+	}
+	[historyDB setMetaValue:@"1" forKey:importedKey];
+}
+
+-(void) importLegacyStore:(NSDictionary *)legacyStore named:(NSString *)sourceName
+{
+	NSString *importedKey = [@"imported:" stringByAppendingString:sourceName];
+	if ( nil != [historyDB metaValueForKey:importedKey] )
+		return;
+
+	int importedCount = 0;
+	if ( [legacyStore isKindOfClass:[NSDictionary class]] ) {
+		importedCount += [self importLegacyList:[legacyStore objectForKey:@"jcList"] into:FlycutHistoryListClippings];
+		importedCount += [self importLegacyList:[legacyStore objectForKey:@"favoritesList"] into:FlycutHistoryListFavorites];
+	}
+	[historyDB setMetaValue:[NSString stringWithFormat:@"%d", importedCount] forKey:importedKey];
+	if ( importedCount > 0 )
+		NSLog(@"Flycut: imported %d clippings from %@", importedCount, sourceName);
+}
+
+// Appends legacy clippings after what is already persisted, keeping each list's own order (Flycut moves a
+// re-copied clipping to the top without changing its timestamp, so timestamps don't give the order) and
+// dropping later duplicates.
+-(int) importLegacyList:(NSArray *)legacyList into:(FlycutHistoryList)list
+{
+	if ( ![legacyList isKindOfClass:[NSArray class]] || [legacyList count] == 0 )
+		return 0;
+
+	NSMutableArray *merged = [NSMutableArray arrayWithArray:[historyDB clippingsInList:list withDisplayLength:displayLength]];
+	int importedCount = 0;
+	for ( NSDictionary *saved in legacyList ) {
+		NSString *contents = [saved objectForKey:@"Contents"];
+		if ( ![saved isKindOfClass:[NSDictionary class]] || ![contents isKindOfClass:[NSString class]] || [contents length] == 0 )
+			continue;
+		FlycutClipping *clipping = [[FlycutClipping alloc] initWithContents:contents
+																   withType:[saved objectForKey:@"Type"]
+														  withDisplayLength:displayLength
+													   withAppLocalizedName:[saved objectForKey:@"AppLocalizedName"]
+														   withAppBundleURL:[saved objectForKey:@"AppBundleURL"]
+															  withTimestamp:[[saved objectForKey:@"Timestamp"] integerValue]];
+		[merged addObject:clipping];
+		[clipping release];
+		importedCount++;
+	}
+
+	NSMutableSet *seenContents = [NSMutableSet set];
+	NSMutableArray *deduplicated = [NSMutableArray array];
+	for ( FlycutClipping *clipping in merged ) {
+		if ( [seenContents containsObject:[clipping contents]] )
+			continue;
+		[seenContents addObject:[clipping contents]];
+		[clipping setRank:(double)([merged count] - [deduplicated count])];
+		[deduplicated addObject:clipping];
+	}
+
+	[historyDB replaceList:list withClippings:deduplicated];
+	return importedCount;
+}
+#endif
+
+-(void) savePreferenceDidChange
+{
+#ifdef FLYCUT_MAC
+	if ( !historyDB )
+		return;
+
+	BOOL shouldPersist = [[NSUserDefaults standardUserDefaults] integerForKey:@"savePreference"] >= 1;
+	if ( shouldPersist && nil == clippingStore.persistence ) {
+		[historyDB replaceList:FlycutHistoryListClippings withClippings:[[self primaryStore] allClippings]];
+		[historyDB replaceList:FlycutHistoryListFavorites withClippings:[favoritesStore allClippings]];
+		[self attachHistoryDB];
+	} else if ( !shouldPersist && nil != clippingStore.persistence ) {
+		[self detachHistoryDB];
+		[historyDB clearAll];
+	}
+#endif
 }
 
 -(void) willShowPreferences
@@ -143,6 +342,11 @@
 -(int) setRememberNum:(int)newRemember forPrimaryStore:(BOOL) isPrimaryStore
 {
 	int oldRemeber = [self rememberNum];
+
+	if ( isPrimaryStore && [[NSUserDefaults standardUserDefaults] boolForKey:@"rememberUnlimited"] ) {
+		[clippingStore setRememberNum:INT_MAX];
+		return INT_MAX;
+	}
 
 	// Ensure that we don't remember zero or fewer clippings.
 	if ( newRemember <= 0 )
@@ -1107,6 +1311,13 @@
 		   || [favoritesStore modifiedSinceLastSaveStore]) )
 		return;
 
+	// With the history database every change is already on disk. The preferences copy only exists to feed iCloud sync.
+	if ( historyDB && ![self cloudKitClippingSyncEnabled] ) {
+		[clippingStore clearModifiedSinceLastSaveStore];
+		[favoritesStore clearModifiedSinceLastSaveStore];
+		return;
+	}
+
     NSMutableDictionary *saveDict;
     saveDict = [NSMutableDictionary dictionaryWithCapacity:3];
     [saveDict setObject:@"0.7" forKey:@"version"];
@@ -1131,6 +1342,9 @@
     } else {
         // Remove clips from store
         [[NSUserDefaults standardUserDefaults] setValue:[NSDictionary dictionary] forKey:@"store"];
+#ifdef FLYCUT_MAC
+        [historyDB clearAll];
+#endif
         DLog(@"Saving preferences on exit");
         [[NSUserDefaults standardUserDefaults] synchronize];
     }

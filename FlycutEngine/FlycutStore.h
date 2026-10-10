@@ -30,6 +30,20 @@
 - (void)willDeleteClippingFromStore:(id)store AtIndex:(int)index;
 @end
 
+typedef NS_ENUM(int, FlycutHistoryList) {
+	FlycutHistoryListClippings = 0,
+	FlycutHistoryListFavorites = 1,
+};
+
+@class FlycutStore;
+
+// Receives every change to a store's list as it happens, so the list can be persisted incrementally.
+@protocol FlycutStorePersistence <NSObject>
+- (void)store:(FlycutStore*)store didSaveClipping:(FlycutClipping*)clipping;
+- (void)store:(FlycutStore*)store didRemoveClippings:(NSArray*)clippings;
+- (void)storeDidClear:(FlycutStore*)store;
+@end
+
 @interface FlycutStore : NSObject {
 
     // Our various listener-related preferences
@@ -81,6 +95,7 @@
 -(NSArray *) previousDisplayStrings:(int)howMany;
 -(NSArray *) previousDisplayStrings:(int)howMany containing:(NSString*)search;
 -(NSArray *) previousIndexes:(int)howMany containing:(NSString*)search; // This method is in newest-first order.
+-(NSArray *) allClippings;
 -(int) indexOfClipping:(FlycutClipping*) clipping;
 -(int) indexOfClipping:(NSString *)clipping ofType:(NSString *)type fromAppLocalizedName:(NSString *)appLocalizedName fromAppBundleURL:(NSString *)bundleURL atTimestamp:(int) timestamp;
 -(bool) removeDuplicates;
@@ -90,8 +105,12 @@
 -(void) addClipping:(FlycutClipping*) clipping;
 -(void) insertClipping:(FlycutClipping*) clipping atIndex:(int) index;
 
+// Replace the list with already-persisted clippings, newest first, without reporting them back to persistence
+-(void) loadPersistedClippings:(NSArray *)clippings;
+
 // Delete a clipping
 -(void) clearItem:(int)index;
+-(void) removeClippingsOlderThan:(NSInteger)cutoffTimestamp;
 
 // Delete all list clippings
 -(void) clearList;
@@ -108,6 +127,12 @@
 
 /** optional delegate (not retained) */
 @property (nonatomic, nullable, assign) id<FlycutStoreDeleteDelegate> deleteDelegate;
+
+/** optional persistence (not retained) */
+@property (nonatomic, nullable, assign) id<FlycutStorePersistence> persistence;
+
+/** which persisted list this store is */
+@property (nonatomic, assign) FlycutHistoryList persistenceListId;
 
 // Delete all named clippings
 @end

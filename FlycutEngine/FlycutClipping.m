@@ -38,6 +38,7 @@
     [self setAppBundleURL:bundleURL];
     [self setTimestamp:timestamp];
     [self setHasName:false];
+    [self setClipId:[[NSUUID UUID] UUIDString]];
     
     return self;
 }
@@ -134,6 +135,18 @@
         clipHasName = newHasName;
 }
 
+-(void) setClipId:(NSString *)newClipId
+{
+    id old = clipId;
+    clipId = [newClipId copy];
+    [old release];
+}
+
+-(void) setRank:(double)newRank
+{
+    clipRank = newRank;
+}
+
 -(void) resetDisplayString
 {
     NSString *newDisplayString, *firstLineOfClipping, *trimmedString;
@@ -216,6 +229,16 @@
     return clipHasName;
 }
 
+-(NSString *) clipId
+{
+    return clipId;
+}
+
+-(double) rank
+{
+    return clipRank;
+}
+
 - (BOOL)isEqual:(id)other {
     if (other == self)
         return YES;
@@ -234,6 +257,7 @@
     [clipType release];
     [appLocalizedName release];
     [appBundleURL release];
+    [clipId release];
     clipDisplayLength = 0;
     [clipDisplayString release];
     clipHasName = 0;

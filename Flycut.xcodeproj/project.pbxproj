@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		660390D13DB7AC61347A5FB8 /* FlycutHistoryDB.m in Sources */ = {isa = PBXBuildFile; fileRef = 2526B83564A62BCA982378A7 /* FlycutHistoryDB.m */; };
 		77192A2A23D6EA7A00EDB9BC /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 77192A2923D6EA7A00EDB9BC /* AppDelegate.m */; };
 		77192A2C23D6EA7B00EDB9BC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 77192A2B23D6EA7B00EDB9BC /* Assets.xcassets */; };
 		77192A2F23D6EA7B00EDB9BC /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 77192A2D23D6EA7B00EDB9BC /* MainMenu.xib */; };
@@ -229,11 +230,13 @@
 /* Begin PBXFileReference section */
 		1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = /System/Library/Frameworks/Cocoa.framework; sourceTree = "<absolute>"; };
 		13E42FB307B3F0F600E4EEF1 /* CoreData.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreData.framework; path = /System/Library/Frameworks/CoreData.framework; sourceTree = "<absolute>"; };
+		2526B83564A62BCA982378A7 /* FlycutHistoryDB.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = FlycutHistoryDB.m; path = FlycutEngine/FlycutHistoryDB.m; sourceTree = SOURCE_ROOT; };
 		29B97316FDCFA39411CA2CEA /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		29B97319FDCFA39411CA2CEA /* English */ = {isa = PBXFileReference; lastKnownFileType = wrapper.nib; name = English; path = English.lproj/MainMenu.nib; sourceTree = "<group>"; };
 		29B97324FDCFA39411CA2CEA /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = /System/Library/Frameworks/AppKit.framework; sourceTree = "<absolute>"; };
 		29B97325FDCFA39411CA2CEA /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = /System/Library/Frameworks/Foundation.framework; sourceTree = "<absolute>"; };
 		32CA4F630368D1EE00C91783 /* Flycut_Prefix.pch */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Flycut_Prefix.pch; sourceTree = "<group>"; };
+		510A9311F16BA6740465B12C /* FlycutHistoryDB.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = FlycutHistoryDB.h; path = FlycutEngine/FlycutHistoryDB.h; sourceTree = SOURCE_ROOT; };
 		77192A1E23D4376200EDB9BC /* FlycutDebug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FlycutDebug.entitlements; sourceTree = "<group>"; };
 		77192A2623D6EA7A00EDB9BC /* FlycutHelper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FlycutHelper.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		77192A2823D6EA7A00EDB9BC /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
@@ -530,6 +533,8 @@
 				77DA6B8F1CB9549B0077917F /* FlycutStore.h */,
 				77DA6B901CB9549B0077917F /* FlycutClipping.m */,
 				77DA6B911CB9549B0077917F /* FlycutClipping.h */,
+				510A9311F16BA6740465B12C /* FlycutHistoryDB.h */,
+				2526B83564A62BCA982378A7 /* FlycutHistoryDB.m */,
 			);
 			name = FlycutEngine;
 			path = JumpcutEngine;
@@ -1097,6 +1102,7 @@
 				7761C8B3139BDF12000FB3AB /* SRValidator.m in Sources */,
 				773ABFB213E9AA1A00AE3969 /* NSWindow+TrueCenter.m in Sources */,
 				DBEB0C9D1442F2AE0080D24E /* NSWindow+ULIZoomEffect.m in Sources */,
+				660390D13DB7AC61347A5FB8 /* FlycutHistoryDB.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1650,6 +1656,10 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 10.13;
 				MARKETING_VERSION = 1.9.7;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lsqlite3",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = "$(FLYCUT_BUNDLE_ID)";
 				PRODUCT_NAME = Flycut;
 				PROVISIONING_PROFILE = "";
@@ -1693,6 +1703,10 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 10.13;
 				MARKETING_VERSION = 1.9.7;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lsqlite3",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = "$(FLYCUT_BUNDLE_ID)";
 				PRODUCT_NAME = Flycut;
 				PROVISIONING_PROFILE = "";

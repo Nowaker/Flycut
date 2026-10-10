@@ -29,6 +29,10 @@
     NSString * appBundleURL;
 // The time
     NSInteger clipTimestamp;
+// Stable identity for persistence and sync; contents alone are not unique when duplicates are kept
+    NSString * clipId;
+// Sort key within a persisted list, higher is more recent
+    double clipRank;
 }
 
 -(id) initWithContents:(NSString *)contents withType:(NSString *)type withDisplayLength:(int)displayLength withAppLocalizedName:(NSString *)localizedName withAppBundleURL:(NSString *)bundleURL withTimestamp:(NSInteger)timestamp;
@@ -42,6 +46,8 @@
 -(void) setType:(NSString *)newType;
 -(void) setDisplayLength:(int)newDisplayLength;
 -(void) setHasName:(BOOL)newHasName;
+-(void) setClipId:(NSString *)newClipId;
+-(void) setRank:(double)newRank;
 
 // Retrieve values
 -(FlycutClipping *) clipping;
@@ -53,6 +59,8 @@
 -(NSString *) appBundleURL;
 -(NSInteger) timestamp;
 -(BOOL) hasName;
+-(NSString *) clipId;
+-(double) rank;
 
 // Additional functions
 -(void) resetDisplayString;

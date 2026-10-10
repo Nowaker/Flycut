@@ -170,13 +170,6 @@
 {
 	[self buildAppearancesPreferencePanel];
 
-	// We no longer get autosave from ShortcutRecorder, so let's set the recorder by hand
-	if ( [[NSUserDefaults standardUserDefaults] dictionaryForKey:@"ShortcutRecorder mainHotkey"] ) {
-		[mainRecorder setKeyCombo:SRMakeKeyCombo([[[[NSUserDefaults standardUserDefaults] dictionaryForKey:@"ShortcutRecorder mainHotkey"] objectForKey:@"keyCode"] intValue],
-												 [[[[NSUserDefaults standardUserDefaults] dictionaryForKey:@"ShortcutRecorder mainHotkey"] objectForKey:@"modifierFlags"] intValue] )
-		];
-	};
-
 	// Initialize the FlycutOperator
 	flycutOperator = [[FlycutOperator alloc] init];
 	flycutOperator.delegate = self;
@@ -186,6 +179,14 @@
 						 withDisplayLength:[[NSUserDefaults standardUserDefaults] integerForKey:@"displayLen"]
 						  withSaveSelector:@selector(savePreferencesOnDict:)
 								 forTarget:self];
+
+	// We no longer get autosave from ShortcutRecorder, so let's set the recorder by hand.
+	// This follows the operator, which may have just imported the hotkey from an earlier Flycut.
+	if ( [[NSUserDefaults standardUserDefaults] dictionaryForKey:@"ShortcutRecorder mainHotkey"] ) {
+		[mainRecorder setKeyCombo:SRMakeKeyCombo([[[[NSUserDefaults standardUserDefaults] dictionaryForKey:@"ShortcutRecorder mainHotkey"] objectForKey:@"keyCode"] intValue],
+												 [[[[NSUserDefaults standardUserDefaults] dictionaryForKey:@"ShortcutRecorder mainHotkey"] objectForKey:@"modifierFlags"] intValue] )
+		];
+	};
 
     [bezel setColor:NO];
     
@@ -460,7 +461,7 @@
 -(int) checkRememberNumPref:(int)newRemember forPrimaryStore:(BOOL) isPrimaryStore
 {
 	int oldRemember = [flycutOperator rememberNum];
-	int setRemember = [flycutOperator setRememberNum:newRemember forPrimaryStore:YES];
+	int setRemember = [flycutOperator setRememberNum:newRemember forPrimaryStore:isPrimaryStore];
 
 	if ( isPrimaryStore )
 	{
@@ -481,6 +482,13 @@
 			}
 		}
 	}
+}
+
+-(IBAction) setHistoryRetentionPref:(id)sender
+{
+	[self checkRememberNumPref:[[NSUserDefaults standardUserDefaults] integerForKey:@"rememberNum"] forPrimaryStore:YES];
+	[flycutOperator pruneExpiredClippings];
+	[self updateMenu];
 }
 
 -(IBAction) setFavoritesRememberNumPref:(id)sender
@@ -1242,6 +1250,7 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 			[alert release];
 		}
 	}
+	[flycutOperator savePreferenceDidChange];
 }
 
 - (IBAction)selectSaveLocation:(id)sender {
