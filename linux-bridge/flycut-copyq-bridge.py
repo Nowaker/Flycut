@@ -14,7 +14,7 @@ What it does and doesn't carry, given what CopyQ offers:
   is left alone. Deleting an item in CopyQ isn't shared.
 - Only the tab's top rows are read: CopyQ reads its items one by one, about 0.7 ms each.
 
-Usage: flycut-copyq-bridge.py --server http://100.x.y.z:8742 --token-file ~/.local/share/flycut-sync-server/token
+Usage: flycut-copyq-bridge.py --server http://desktop.example.ts.net:8742 --token-file ~/.local/share/flycut-sync-server/token
 """
 
 import argparse
@@ -65,9 +65,10 @@ var out = [], n = Math.min(size(), Number(arguments[2]));
 for (var i = 0; i < n; i++) out.push(str(read("text/plain", i)));
 print(JSON.stringify(out));"""
 
+    # Clippings go in on stdin: CopyQ rewrites backslash escapes in command-line arguments, which breaks JSON.
     # Inserts [{text, top}] (oldest first) unless one of the tab's top rows already holds the text.
     INSERT = """tab(arguments[1]);
-var items = JSON.parse(arguments[2]), seen = {}, n = Math.min(size(), Number(arguments[3])), added = [];
+var items = JSON.parse(str(input())), seen = {}, n = Math.min(size(), Number(arguments[2])), added = [];
 for (var i = 0; i < n; i++) seen[str(read("text/plain", i))] = true;
 for (var j = 0; j < items.length; j++) {
     if (seen[items[j].text]) continue;
@@ -78,9 +79,9 @@ for (var j = 0; j < items.length; j++) {
 print(JSON.stringify(added));"""
 
     REMOVE = """tab(arguments[1]);
-var wanted = {}, texts = JSON.parse(arguments[2]), rows = [];
+var wanted = {}, texts = JSON.parse(str(input())), rows = [];
 for (var j = 0; j < texts.length; j++) wanted[texts[j]] = true;
-var n = Math.min(size(), Number(arguments[3]));
+var n = Math.min(size(), Number(arguments[2]));
 for (var i = 0; i < n; i++) {
     var t = str(read("text/plain", i));
     if (wanted[t]) { rows.push(i); delete wanted[t]; }
@@ -91,8 +92,8 @@ print(JSON.stringify(rows.length));"""
     def __init__(self, tab):
         self.tab = tab
 
-    def eval(self, script, *args):
-        result = subprocess.run(["copyq", "eval", script, *map(str, args)],
+    def eval(self, script, *args, stdin=None):
+        result = subprocess.run(["copyq", "eval", script, *map(str, args)], input=stdin,
                                 capture_output=True, text=True, timeout=120)
         if result.returncode != 0:
             raise RuntimeError(f"copyq eval failed: {result.stderr.strip()[:200]}")
@@ -102,10 +103,10 @@ print(JSON.stringify(rows.length));"""
         return [text or None for text in self.eval(self.TOP, self.tab, rows)]
 
     def insert(self, items):
-        return self.eval(self.INSERT, self.tab, json.dumps(items), DEDUPE_ROWS) if items else []
+        return self.eval(self.INSERT, self.tab, DEDUPE_ROWS, stdin=json.dumps(items)) if items else []
 
     def remove(self, texts):
-        return self.eval(self.REMOVE, self.tab, json.dumps(sorted(texts)), SEARCH_ROWS) if texts else 0
+        return self.eval(self.REMOVE, self.tab, SEARCH_ROWS, stdin=json.dumps(sorted(texts))) if texts else 0
 
 
 class Server:
@@ -373,7 +374,7 @@ class Bridge:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--server", required=True, help="flycut-sync-server address, e.g. http://100.x.y.z:8742")
+    parser.add_argument("--server", required=True, help="flycut-sync-server address, e.g. http://desktop.example.ts.net:8742")
     parser.add_argument("--token-file", required=True, help="file holding the server's bearer token")
     parser.add_argument("--tab", default=None, help="CopyQ tab to sync (default: CopyQ's clipboard tab)")
     parser.add_argument("--state-dir", default="~/.local/share/flycut-copyq-bridge")
