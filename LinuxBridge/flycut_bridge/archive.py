@@ -31,6 +31,10 @@ OPTIONAL_STRINGS = TypeAdapter(tuple[str, ...] | None)
 INTEGER = TypeAdapter(tuple[int])
 
 
+def contains_folded(text: str, needle: str) -> int:
+    return int(needle.casefold() in text.casefold())
+
+
 def string_rows(cursor: sqlite3.Cursor) -> Generator[tuple[str, ...]]:
     while row := OPTIONAL_STRINGS.validate_python(cursor.fetchone()):
         yield row
@@ -68,6 +72,7 @@ class Archive:
     @contextmanager
     def transaction(self, *, write: bool = True) -> Generator[sqlite3.Connection]:
         with closing(sqlite3.connect(self.path, timeout=10)) as db:
+            db.create_function("contains_folded", 2, contains_folded, deterministic=True)
             db.execute("PRAGMA synchronous=FULL")
             if not write:
                 db.execute("PRAGMA query_only=ON")

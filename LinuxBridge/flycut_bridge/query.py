@@ -60,7 +60,7 @@ def search(archive: Archive, request: Search) -> Page:
               'favorite',json(CASE favorite WHEN 1 THEN 'true' ELSE 'false' END),
               'recent_clock',recent_clock,'recent_device',recent_device,'recent_event',recent_event)
             FROM items WHERE deleted=0 AND payload IS NOT NULL AND (?=0 OR favorite=1)
-              AND instr(lower(json_extract(payload,'$.text')),lower(?))>0
+              AND contains_folded(json_extract(payload,'$.text'),?)=1
               AND (recent_clock,recent_device,recent_event,item_id)<(?,?,?,?)
             ORDER BY recent_clock DESC,recent_device DESC,recent_event DESC,item_id DESC LIMIT ?"""
         else:
@@ -71,7 +71,7 @@ def search(archive: Archive, request: Search) -> Page:
             SELECT json_object('item_id',item_id,'payload',json(payload),'favorite',json(CASE favorite
               WHEN 1 THEN 'true' ELSE 'false' END),'recent_clock',recent_clock,'recent_device',recent_device,
               'recent_event',recent_event)
-            FROM ranked WHERE instr(lower(json_extract(payload,'$.text')),lower(?))>0
+            FROM ranked WHERE contains_folded(json_extract(payload,'$.text'),?)=1
               AND representative=1 AND (recent_clock,recent_device,recent_event,item_id)<(?,?,?,?)
             ORDER BY recent_clock DESC,recent_device DESC,recent_event DESC,item_id DESC LIMIT ?"""
         rows = db.execute(query, (int(request.favorites), request.text, *stamp, request.limit + 1))

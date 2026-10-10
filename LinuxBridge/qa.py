@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["pydantic>=2.10,<3"]
+# dependencies = ["pydantic>=2.10,<3", "jeepney>=0.9,<0.10"]
 # ///
 # Run: uv run LinuxBridge/qa.py /path/to/shared/archive-v1.json
 """Portable real-SQLite/folder driver; consumes the shared reducer fixture unchanged."""
@@ -16,8 +16,8 @@ from typing import Annotated
 from pydantic import Field, JsonValue, TypeAdapter, ValidationError
 
 from flycut_bridge.archive import INTEGER, Archive
+from flycut_bridge.clipboard import Observer, Selection
 from flycut_bridge.folder import Folder, child, directory, publish, read_file
-from flycut_bridge.klipper import Observer, Selection
 from flycut_bridge.protocol import EVENT, BridgeError, CreatePayload, Event, Model
 from flycut_bridge.query import Search, search
 
@@ -175,8 +175,11 @@ def portable(root: Path, collection: str) -> None:
     require(a.events_after(0)[0][1].collection_id == "10000000-0000-0000-0000-000000000099",
             "collection join did not rewrite envelope collection")
     require(a.events_after(0)[0][1].item_id == initial, "join changed local item identity")
+    unicode_item = a.capture("CAFÉ Straße\0tail")
+    require(search(a, Search(text="café strasse\0TAIL")).items[0].item_id == unicode_item,
+            "Unicode casefold or embedded-NUL literal search failed")
     print("Portable SQLite/folder/observer QA passed: durable reopen, seed, no echo, conflict rollback, " +
-          "clear/favorites, cursors, delayed files, symlink rejection, explicit join.")
+          "clear/favorites, cursors, delayed files, symlink rejection, explicit join, Unicode/NUL search.")
 
 
 def main() -> None:
