@@ -9,3 +9,8 @@ build/
 *.mode2v3
 xcuserdata
 xcshareddata
+.vibeterm/
+.env*
+!.env.example
+tmp/*
+!tmp/.keep
