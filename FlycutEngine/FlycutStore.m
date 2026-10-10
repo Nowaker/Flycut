@@ -163,12 +163,13 @@
 	double olderRank = hasOlder ? [[jcList objectAtIndex:index + 1] rank] : 0;
 
 	// A new top clipping ranks by the current time, so tops from different machines interleave by when they were made.
+	// Stepping past an older top by a millisecond rather than a second keeps rapid moves from running ahead of the clock.
 	if ( hasNewer && hasOlder )
 		[clipping setRank:(newerRank + olderRank) / 2];
 	else if ( hasNewer )
 		[clipping setRank:newerRank - 1];
 	else
-		[clipping setRank:MAX(olderRank + 1, [[NSDate date] timeIntervalSince1970])];
+		[clipping setRank:MAX(olderRank + 0.001, [[NSDate date] timeIntervalSince1970])];
 }
 
 -(void) persistRemovedClippings:(NSArray *)clippings

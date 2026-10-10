@@ -20,6 +20,7 @@
 #import "AppController.h"
 #import "FlycutHistoryDB.h"
 #import "FlycutFolderSync.h"
+#import "FlycutServerMirror.h"
 #endif
 
 @implementation FlycutOperator {
@@ -187,7 +188,7 @@
 			[self attachHistoryDB];
 			[clippingStore loadPersistedClippings:[historyDB clippingsInList:FlycutHistoryListClippings withDisplayLength:displayLength]];
 			[favoritesStore loadPersistedClippings:[historyDB clippingsInList:FlycutHistoryListFavorites withDisplayLength:displayLength]];
-			[self folderSyncPreferenceDidChange];
+			[self syncPreferenceDidChange];
 		}
 		return;
 	}
@@ -221,42 +222,96 @@
 		clippingStore.persistence = historyDB;
 		favoritesStore.persistence = historyDB;
 	}
+	[serverMirror stop];
+	[serverMirror release];
+	serverMirror = nil;
 	[folderSync stop];
 	[folderSync release];
 	folderSync = nil;
 }
 
--(void) folderSyncPreferenceDidChange
+-(void) restartSync
 {
-	NSString *folder = [[[NSUserDefaults standardUserDefaults] stringForKey:@"syncFolderPath"] stringByExpandingTildeInPath];
-	BOOL wanted = historyDB
-		&& [[NSUserDefaults standardUserDefaults] boolForKey:@"syncFolderEnabled"]
-		&& [[NSUserDefaults standardUserDefaults] integerForKey:@"savePreference"] >= 1
-		&& [folder length] > 0;
-	BOOL attached = nil != clippingStore.persistence;
-
-	if ( folderSync && wanted && [[folderSync folder] isEqualToString:[folder stringByStandardizingPath]] )
-		return;
 	[self stopFolderSync];
-	[folderSyncError release];
-	folderSyncError = nil;
-	if ( wanted ) {
-		folderSync = [[FlycutFolderSync alloc] initWithFolder:folder historyDB:historyDB clippingStore:clippingStore favoritesStore:favoritesStore];
-		[folderSync setDidApplyRemoteChanges:^{
-			[self adjustStackPositionIfOutOfBounds];
-		}];
-		if ( attached )
-			[self attachHistoryDB];
-		if ( ![folderSync start] ) {
-			folderSyncError = [[folderSync lastError] copy];
-			[self stopFolderSync];
-		}
-	}
-	if ( attached )
-		[self attachHistoryDB];
+	[self syncPreferenceDidChange];
 }
 
--(NSString *) folderSyncStatus
+-(void) syncPreferenceDidChange
+{
+	NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+	BOOL persisting = historyDB && [defaults integerForKey:@"savePreference"] >= 1;
+	NSString *folder = nil;
+	NSURL *server = nil;
+	NSString *token = nil;
+	NSString *problem = nil;
+
+	if ( persisting && [defaults boolForKey:@"syncServerEnabled"] ) {
+		server = [NSURL URLWithString:[[defaults stringForKey:@"syncServerURL"] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]] ?: @""];
+		token = [FlycutServerMirror tokenForServerURL:server];
+		NSString *scheme = [[server scheme] lowercaseString];
+		if ( !([scheme isEqualToString:@"https"] || [scheme isEqualToString:@"http"]) || [[server host] length] == 0 )
+			problem = @"enter the server's address, starting with https:// (or http:// on your tailnet)";
+		else if ( [token length] == 0 )
+			problem = @"enter the server's token";
+		else
+			folder = [FlycutServerMirror localFolderForServerURL:server];
+	} else if ( persisting && [defaults boolForKey:@"syncFolderEnabled"] ) {
+		folder = [[defaults stringForKey:@"syncFolderPath"] stringByExpandingTildeInPath];
+		if ( [folder length] == 0 )
+			folder = nil;
+	}
+
+	BOOL sameServer = (nil == server && nil == serverMirror) || [[serverMirror serverURL] isEqual:server];
+	if ( folderSync && folder && sameServer && [[folderSync folder] isEqualToString:[folder stringByStandardizingPath]] )
+		return;
+	BOOL attached = nil != clippingStore.persistence;
+	[self stopFolderSync];
+	[folderSyncError release];
+	folderSyncError = [problem copy];
+	if ( !folder )
+		return;
+
+	if ( server )
+		[[NSFileManager defaultManager] createDirectoryAtPath:folder withIntermediateDirectories:YES attributes:@{NSFilePosixPermissions: @0700} error:nil];
+	FlycutFolderSync *sync = [[FlycutFolderSync alloc] initWithFolder:folder historyDB:historyDB clippingStore:clippingStore favoritesStore:favoritesStore];
+	folderSync = sync;
+	[folderSync setDidApplyRemoteChanges:^{
+		[self adjustStackPositionIfOutOfBounds];
+	}];
+	if ( attached )
+		[self attachHistoryDB];
+
+	void (^startSync)(void) = ^{
+		if ( folderSync != sync )
+			return;
+		if ( ![folderSync start] ) {
+			[folderSyncError release];
+			folderSyncError = [[folderSync lastError] copy];
+			[self stopFolderSync];
+			if ( attached )
+				[self attachHistoryDB];
+			return;
+		}
+		[serverMirror startWithInterval:3 onDownload:^{
+			[sync poll];
+		}];
+	};
+	if ( !server ) {
+		startSync();
+		return;
+	}
+	serverMirror = [[FlycutServerMirror alloc] initWithServerURL:server token:token localFolder:folder machineId:[folderSync machineId]];
+	// The first time, what the other machines have is fetched before this machine's history is shared, so their deletions stand.
+	NSString *ownLog = [folder stringByAppendingPathComponent:[[folderSync machineId] stringByAppendingPathExtension:@"jsonl"]];
+	if ( [[NSFileManager defaultManager] fileExistsAtPath:ownLog] )
+		startSync();
+	else
+		[serverMirror syncWithCompletion:^(BOOL downloaded) {
+			startSync();
+		}];
+}
+
+-(NSString *) syncStatus
 {
 	if ( folderSyncError )
 		return [NSString stringWithFormat:@"Not syncing: %@.", folderSyncError];
@@ -264,9 +319,11 @@
 		return @"Off.";
 	NSUInteger others = [folderSync otherMachineCount];
 	NSString *machines = others == 1 ? @"1 other Mac or PC" : [NSString stringWithFormat:@"%lu other Macs or PCs", (unsigned long)others];
-	if ( [folderSync lastError] )
-		return [NSString stringWithFormat:@"Syncing with %@; last problem: %@.", machines, [folderSync lastError]];
-	return [NSString stringWithFormat:@"Syncing with %@. This machine is %@.", machines, [folderSync machineId]];
+	NSString *through = serverMirror ? [NSString stringWithFormat:@" through %@", [[serverMirror serverURL] host]] : @"";
+	NSString *problem = [serverMirror lastError] ?: [folderSync lastError];
+	if ( problem )
+		return [NSString stringWithFormat:@"Syncing%@ with %@; last problem: %@.", through, machines, problem];
+	return [NSString stringWithFormat:@"Syncing%@ with %@. This machine is %@.", through, machines, [folderSync machineId]];
 }
 
 // History saved by earlier Flycut versions: this build's own preferences, then the Mac App Store
@@ -389,7 +446,7 @@
 		[self detachHistoryDB];
 		[historyDB clearAll];
 	}
-	[self folderSyncPreferenceDidChange];
+	[self syncPreferenceDidChange];
 #endif
 }
 

@@ -13,6 +13,7 @@
 // interface and platform-specific mechanisms.
 
 #import "AppController.h"
+#import "FlycutServerMirror.h"
 #import "SGHotKey.h"
 #import "SGHotKeyCenter.h"
 #import "SRRecorderCell.h"
@@ -80,6 +81,8 @@
         @"mainHotkeyPopup",
         [NSNumber numberWithBool:NO],
         @"syncFolderEnabled",
+        [NSNumber numberWithBool:NO],
+        @"syncServerEnabled",
         nil]];
 
 	/* For testing, the ability to force initial values of the sync settings:
@@ -752,25 +755,38 @@
 		}
 	}
 	[flycutOperator willShowPreferences];
-	[self updateFolderSyncLabels];
+	[self showSyncServerToken];
+	[self updateSyncLabels];
 }
 
--(void) updateFolderSyncLabels
+-(void) updateSyncLabels
 {
 	NSString *folder = [[NSUserDefaults standardUserDefaults] stringForKey:@"syncFolderPath"];
 	[syncFolderLabel setStringValue:[folder length] ? [folder stringByAbbreviatingWithTildeInPath] : @"No folder chosen"];
-	[syncStatusLabel setStringValue:[flycutOperator folderSyncStatus]];
+	[syncStatusLabel setStringValue:[flycutOperator syncStatus]];
+	// A server problem can show up any time, so the status keeps itself current while it can be seen.
+	[NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(updateSyncLabels) object:nil];
+	if ( [prefsPanel isVisible] )
+		[self performSelector:@selector(updateSyncLabels) withObject:nil afterDelay:2];
+}
+
+-(void) showSyncServerToken
+{
+	NSURL *server = [NSURL URLWithString:[[NSUserDefaults standardUserDefaults] stringForKey:@"syncServerURL"] ?: @""];
+	[syncServerTokenField setStringValue:[FlycutServerMirror tokenForServerURL:server] ?: @""];
 }
 
 -(IBAction) toggleFolderSync:(id)sender
 {
 	BOOL enabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"syncFolderEnabled"];
+	if ( enabled )
+		[[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"syncServerEnabled"];
 	if ( enabled && [[[NSUserDefaults standardUserDefaults] stringForKey:@"syncFolderPath"] length] == 0 ) {
 		[self chooseSyncFolder:sender];
 		return;
 	}
-	[flycutOperator folderSyncPreferenceDidChange];
-	[self updateFolderSyncLabels];
+	[flycutOperator syncPreferenceDidChange];
+	[self updateSyncLabels];
 }
 
 -(IBAction) chooseSyncFolder:(id)sender
@@ -787,12 +803,35 @@
 		if ( result == NSModalResponseOK && url ) {
 			[[NSUserDefaults standardUserDefaults] setObject:[url path] forKey:@"syncFolderPath"];
 			[[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"syncFolderEnabled"];
+			[[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"syncServerEnabled"];
 		} else if ( [[[NSUserDefaults standardUserDefaults] stringForKey:@"syncFolderPath"] length] == 0 ) {
 			[[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"syncFolderEnabled"];
 		}
-		[flycutOperator folderSyncPreferenceDidChange];
-		[self updateFolderSyncLabels];
+		[flycutOperator syncPreferenceDidChange];
+		[self updateSyncLabels];
 	}];
+}
+
+-(IBAction) toggleServerSync:(id)sender
+{
+	if ( [[NSUserDefaults standardUserDefaults] boolForKey:@"syncServerEnabled"] )
+		[[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"syncFolderEnabled"];
+	[flycutOperator syncPreferenceDidChange];
+	[self updateSyncLabels];
+}
+
+-(IBAction) setSyncServer:(id)sender
+{
+	// The address field is bound to the preference; the token goes to the keychain under the address it belongs to.
+	NSString *address = [[syncServerURLField stringValue] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+	[[NSUserDefaults standardUserDefaults] setObject:address forKey:@"syncServerURL"];
+	NSURL *server = [NSURL URLWithString:address];
+	if ( sender == syncServerTokenField )
+		[FlycutServerMirror setToken:[syncServerTokenField stringValue] forServerURL:server];
+	else
+		[self showSyncServerToken];
+	[flycutOperator restartSync];
+	[self updateSyncLabels];
 }
 
 -(IBAction)toggleLoadOnStartup:(id)sender {
@@ -1369,7 +1408,7 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 		}
 	}
 	[flycutOperator savePreferenceDidChange];
-	[self updateFolderSyncLabels];
+	[self updateSyncLabels];
 }
 
 - (IBAction)selectSaveLocation:(id)sender {

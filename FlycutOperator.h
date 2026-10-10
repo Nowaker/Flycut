@@ -19,6 +19,7 @@
 
 @class FlycutHistoryDB;
 @class FlycutFolderSync;
+@class FlycutServerMirror;
 
 @protocol FlycutOperatorDelegate <NSObject>
 @optional
@@ -37,6 +38,7 @@
 	FlycutHistoryDB			*historyDB;
 	FlycutFolderSync		*folderSync;
 	NSString				*folderSyncError;
+	FlycutServerMirror		*serverMirror;
 	NSTimer					*expiryTimer;
 
 	SEL saveSelector;
@@ -96,9 +98,12 @@
 // Initialization / cleanup related
 -(void)applicationWillTerminate;;
 
-// Starts, restarts or stops sharing history through the folder in the syncFolderEnabled/syncFolderPath preferences.
--(void)folderSyncPreferenceDidChange;
--(NSString *)folderSyncStatus;
+// Starts, restarts or stops sharing history as the sync preferences say: through the folder in
+// syncFolderEnabled/syncFolderPath, or through the server in syncServerEnabled/syncServerURL with its keychain token.
+-(void)syncPreferenceDidChange;
+// Same, but starts over even if the folder or server didn't change, as after a new token.
+-(void)restartSync;
+-(NSString *)syncStatus;
 -(void)awakeFromNibDisplaying:(int) displayNum withDisplayLength:(int) displayLength withSaveSelector:(SEL) selector forTarget:(NSObject*) target;
 
 // Favorites Store related

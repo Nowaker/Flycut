@@ -35,6 +35,8 @@
 	IBOutlet NSBox			  *appearancePanel;
 	IBOutlet NSTextField		*syncFolderLabel;
 	IBOutlet NSTextField		*syncStatusLabel;
+	IBOutlet NSTextField		*syncServerURLField;
+	IBOutlet NSSecureTextField	*syncServerTokenField;
 	int							mainHotkeyModifiers;
 	SRKeyCodeTransformer        *srTransformer;
 	BOOL						isBezelDisplayed;
@@ -134,6 +136,8 @@
 -(IBAction) setSavePreference:(id)sender;
 -(IBAction) toggleFolderSync:(id)sender;
 -(IBAction) chooseSyncFolder:(id)sender;
+-(IBAction) toggleServerSync:(id)sender;
+-(IBAction) setSyncServer:(id)sender;
 -(void) setHotKeyPreferenceForRecorder:(SRRecorderControl *)aRecorder;
 
 @end
