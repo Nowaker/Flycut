@@ -27,6 +27,7 @@
 		7761C888139BDE94000FB3AB /* UKLoginItemRegistry.m in Sources */ = {isa = PBXBuildFile; fileRef = 7761C884139BDE94000FB3AB /* UKLoginItemRegistry.m */; };
 		7761C890139BDEAF000FB3AB /* BezelWindow.h in Headers */ = {isa = PBXBuildFile; fileRef = 7761C88A139BDEAF000FB3AB /* BezelWindow.h */; };
 		7761C891139BDEAF000FB3AB /* BezelWindow.m in Sources */ = {isa = PBXBuildFile; fileRef = 7761C88B139BDEAF000FB3AB /* BezelWindow.m */; };
+		FCE100011234567890ABCDEF /* HistoryPanelController.m in Sources */ = {isa = PBXBuildFile; fileRef = FCE100031234567890ABCDEF /* HistoryPanelController.m */; };
 		7761C892139BDEAF000FB3AB /* RoundRecBezierPath.h in Headers */ = {isa = PBXBuildFile; fileRef = 7761C88C139BDEAF000FB3AB /* RoundRecBezierPath.h */; };
 		7761C893139BDEAF000FB3AB /* RoundRecBezierPath.m in Sources */ = {isa = PBXBuildFile; fileRef = 7761C88D139BDEAF000FB3AB /* RoundRecBezierPath.m */; };
 		7761C894139BDEAF000FB3AB /* RoundRecTextField.h in Headers */ = {isa = PBXBuildFile; fileRef = 7761C88E139BDEAF000FB3AB /* RoundRecTextField.h */; };
@@ -252,6 +253,8 @@
 		7761C884139BDE94000FB3AB /* UKLoginItemRegistry.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = UKLoginItemRegistry.m; sourceTree = "<group>"; };
 		7761C88A139BDEAF000FB3AB /* BezelWindow.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BezelWindow.h; sourceTree = "<group>"; };
 		7761C88B139BDEAF000FB3AB /* BezelWindow.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = BezelWindow.m; sourceTree = "<group>"; };
+		FCE100021234567890ABCDEF /* HistoryPanelController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HistoryPanelController.h; sourceTree = "<group>"; };
+		FCE100031234567890ABCDEF /* HistoryPanelController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HistoryPanelController.m; sourceTree = "<group>"; };
 		7761C88C139BDEAF000FB3AB /* RoundRecBezierPath.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RoundRecBezierPath.h; sourceTree = "<group>"; };
 		7761C88D139BDEAF000FB3AB /* RoundRecBezierPath.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = RoundRecBezierPath.m; sourceTree = "<group>"; };
 		7761C88E139BDEAF000FB3AB /* RoundRecTextField.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RoundRecTextField.h; sourceTree = "<group>"; };
@@ -563,6 +566,8 @@
 			children = (
 				7761C88A139BDEAF000FB3AB /* BezelWindow.h */,
 				7761C88B139BDEAF000FB3AB /* BezelWindow.m */,
+				FCE100021234567890ABCDEF /* HistoryPanelController.h */,
+				FCE100031234567890ABCDEF /* HistoryPanelController.m */,
 				7761C88C139BDEAF000FB3AB /* RoundRecBezierPath.h */,
 				7761C88D139BDEAF000FB3AB /* RoundRecBezierPath.m */,
 				7761C88E139BDEAF000FB3AB /* RoundRecTextField.h */,
@@ -1099,6 +1104,7 @@
 				7761C885139BDE94000FB3AB /* LoginItemsAE.c in Sources */,
 				7761C888139BDE94000FB3AB /* UKLoginItemRegistry.m in Sources */,
 				7761C891139BDEAF000FB3AB /* BezelWindow.m in Sources */,
+				FCE100011234567890ABCDEF /* HistoryPanelController.m in Sources */,
 				7761C893139BDEAF000FB3AB /* RoundRecBezierPath.m in Sources */,
 				7761C895139BDEAF000FB3AB /* RoundRecTextField.m in Sources */,
 				7761C89A139BDEC4000FB3AB /* UKPrefsPanel.m in Sources */,
