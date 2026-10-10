@@ -1,0 +1,11 @@
+workflow:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master-nowaker-gpt"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+protocol:
+  image: python:3.12-slim
+  timeout: 10 minutes
+  script:
+    - python3 -m unittest discover -s SyncService -p 'test_*.py' -v
+    - python3 -m SyncService.fixture_check FlycutEngine/Tests/Fixtures/archive-v1.json

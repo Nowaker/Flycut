@@ -1,0 +1,39 @@
+name: Archive and sync validation
+
+"on":
+  push:
+    branches: [master-nowaker-gpt]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flycut-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exercise authenticated service boundaries
+        run: python3 -m unittest discover -s SyncService -p 'test_*.py' -v
+      - name: Validate shared event fixtures
+        run: python3 -m SyncService.fixture_check FlycutEngine/Tests/Fixtures/archive-v1.json
+      - name: Exercise native archive storage and migration
+        if: runner.os == 'macOS'
+        env:
+          TMPDIR: ${{ github.workspace }}/tmp/
+        run: bash FlycutEngine/Tests/run-archive-tests.sh
