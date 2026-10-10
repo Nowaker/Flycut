@@ -7,6 +7,7 @@
 - (void)pasteSelection:(id)sender;
 - (void)pasteClickedRow:(id)sender;
 - (void)updateSelection;
+- (void)layoutPreview;
 @end
 
 @implementation HistoryPanelController
@@ -413,12 +414,31 @@
 
 - (void)updateSelection
 {
+    [self layoutPreview];
     NSInteger row = tableView.selectedRow;
     BOOL selected = row >= 0 && row < (NSInteger)entries.count;
     previewView.string = selected ? entries[row][@"text"] : @"";
     [previewView.textStorage addAttribute:NSParagraphStyleAttributeName value:previewView.defaultParagraphStyle range:NSMakeRange(0, previewView.string.length)];
     [previewView scrollRangeToVisible:NSMakeRange(0, 0)];
+    NSClipView *clip = previewView.enclosingScrollView.contentView;
+    [clip scrollToPoint:NSMakePoint(0, clip.bounds.origin.y)];
     pasteButton.enabled = selected;
+}
+
+- (void)layoutPreview
+{
+    [self.window.contentView layoutSubtreeIfNeeded];
+    NSSize size = previewView.enclosingScrollView.contentSize;
+    previewView.minSize = NSMakeSize(size.width, size.height);
+    [previewView setFrameSize:NSMakeSize(size.width, MAX(size.height, previewView.frame.size.height))];
+    previewView.textContainer.containerSize = NSMakeSize(MAX(1, size.width - 2 * previewView.textContainerInset.width), CGFLOAT_MAX);
+}
+
+- (void)windowDidResize:(NSNotification *)notification
+{
+    [self layoutPreview];
+    NSClipView *clip = previewView.enclosingScrollView.contentView;
+    [clip scrollToPoint:NSMakePoint(0, clip.bounds.origin.y)];
 }
 
 - (void)pasteSelection:(id)sender
