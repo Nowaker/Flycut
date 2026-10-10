@@ -23,7 +23,18 @@
 #import "FlycutEngine/FlycutArchive.h"
 #import "Sync/FlycutSync.h"
 #import "Sync/FlycutSyncSettingsController.h"
+#include <sys/stat.h>
 NSString * const FlycutOperatorArchiveReadyNotification = @"FlycutOperatorArchiveReadyNotification";
+
+static NSDictionary *ReadLegacyDefaults(NSURL *url, NSError **error) {
+    NSData *data = [NSData dataWithContentsOfURL:url options:0 error:NULL];
+    id defaults = data ? [NSPropertyListSerialization propertyListWithData:data options:NSPropertyListImmutable format:NULL error:NULL] : nil;
+    if (![defaults isKindOfClass:NSDictionary.class]) {
+        if (error) *error = [NSError errorWithDomain:FlycutArchiveErrorDomain code:FlycutArchiveStorageError userInfo:@{NSLocalizedDescriptionKey:@"The legacy Flycut preferences file is unreadable or invalid. Choose a readable preferences plist with Import Legacy History. Nothing was marked imported."}];
+        return nil;
+    }
+    return defaults;
+}
 #endif
 
 @implementation FlycutOperator {
@@ -36,6 +47,9 @@ NSString * const FlycutOperatorArchiveReadyNotification = @"FlycutOperatorArchiv
     dispatch_queue_t _archiveQueue;
     NSString *_observedClipboard;
     BOOL _archiveReady;
+    BOOL _archiveOpening;
+    BOOL _skipLegacyImport;
+    NSURL *_legacyImportURL;
 #endif
 }
 
@@ -113,6 +127,84 @@ NSString * const FlycutOperatorArchiveReadyNotification = @"FlycutOperatorArchiv
 -(FlycutSyncController *)syncController { return _syncController; }
 -(NSError *)archiveError { return _archiveError; }
 
++(NSDictionary *)legacyDefaultsInHome:(NSString *)home forkDomain:(NSDictionary *)fork
+                       upstreamDomain:(NSDictionary *)upstream sandboxed:(BOOL)sandboxed error:(NSError **)error
+{
+    id forkStore = fork[@"store"];
+    id history = [forkStore isKindOfClass:NSDictionary.class] ? forkStore[@"jcList"] : nil;
+    id favorites = [forkStore isKindOfClass:NSDictionary.class] ? forkStore[@"favoritesList"] : nil;
+    BOOL forkHasHistory = (forkStore && ![forkStore isKindOfClass:NSDictionary.class]) ||
+        (history && (![history isKindOfClass:NSArray.class] || [history count])) ||
+        (favorites && (![favorites isKindOfClass:NSArray.class] || [favorites count]));
+    if (forkHasHistory) return fork;
+    if (sandboxed) {
+        if (error) *error = [NSError errorWithDomain:FlycutArchiveErrorDomain code:FlycutArchiveStorageError userInfo:@{NSLocalizedDescriptionKey:@"Legacy history needs a read grant. Use Import Legacy History to choose ~/Library/Containers/com.generalarcade.flycut/Data/Library/Preferences/com.generalarcade.flycut.plist (or the old non-sandboxed preferences plist). If there is no history to import, explicitly choose Start New Archive. Nothing was marked imported."}];
+        return nil;
+    }
+    NSArray *paths = @[
+        [home stringByAppendingPathComponent:@"Library/Containers/com.generalarcade.flycut/Data/Library/Preferences/com.generalarcade.flycut.plist"],
+        [home stringByAppendingPathComponent:@"Library/Preferences/com.generalarcade.flycut.plist"]
+    ];
+    NSDictionary *selected = upstream ?: fork;
+    for (NSString *path in paths) {
+        struct stat attributes;
+        if (lstat(path.fileSystemRepresentation, &attributes)) {
+            if (errno == ENOENT) continue;
+            if (error) *error = [NSError errorWithDomain:FlycutArchiveErrorDomain code:FlycutArchiveStorageError userInfo:@{NSLocalizedDescriptionKey:@"Cannot check the upstream Flycut preferences location. Use Import Legacy History to grant read access, or explicitly choose Start New Archive. Nothing was marked imported."}];
+            return nil;
+        }
+        if (!S_ISREG(attributes.st_mode)) {
+            if (error) *error = [NSError errorWithDomain:FlycutArchiveErrorDomain code:FlycutArchiveStorageError userInfo:@{NSLocalizedDescriptionKey:@"The upstream preferences location is not a regular plist. Choose a readable preferences file with Import Legacy History. Nothing was marked imported."}];
+            return nil;
+        }
+        NSDictionary *candidate = ReadLegacyDefaults([NSURL fileURLWithPath:path], error);
+        if (!candidate) return nil;
+        if (selected[@"store"] && candidate[@"store"] && ![selected[@"store"] isEqual:candidate[@"store"]]) {
+            if (error) *error = [NSError errorWithDomain:FlycutArchiveErrorDomain code:FlycutArchiveStorageError userInfo:@{NSLocalizedDescriptionKey:@"Different upstream Flycut histories were found in the regular preferences and App Store container. Use Import Legacy History to explicitly choose the source. Original files remain unchanged; nothing was marked imported."}];
+            return nil;
+        }
+        if (candidate[@"store"] || !selected) selected = candidate;
+    }
+    return selected ?: @{};
+}
+
++(NSDictionary *)legacyDefaultsForMigration:(NSError **)error
+{
+    NSString *path = [[[NSProcessInfo processInfo] environment] objectForKey:@"FLYCUT_LEGACY_DEFAULTS_PATH"];
+    if (path.length) return ReadLegacyDefaults([NSURL fileURLWithPath:path], error);
+    BOOL sandboxed = FlycutSyncIsSandboxed();
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    return [self legacyDefaultsInHome:[self legacyHomeDirectory]
+                          forkDomain:[defaults persistentDomainForName:@"net.nowaker.flycut"]
+                      upstreamDomain:sandboxed ? nil : [defaults persistentDomainForName:@"com.generalarcade.flycut"]
+                           sandboxed:sandboxed error:error];
+}
+
++(NSString *)legacyHomeDirectory { return NSHomeDirectory(); }
+
+-(BOOL)importLegacyDefaultsFromURL:(NSURL *)url
+{
+    if (_archiveReady || _archiveOpening || !url.isFileURL) return NO;
+    [_legacyImportURL release];
+    _legacyImportURL = [url retain];
+    _skipLegacyImport = NO;
+    [_archiveError release]; _archiveError = nil;
+    [[NSNotificationCenter defaultCenter] postNotificationName:FlycutOperatorArchiveReadyNotification object:self];
+    [self openArchive];
+    return YES;
+}
+
+-(BOOL)startArchiveWithoutLegacyImport
+{
+    if (_archiveReady || _archiveOpening) return NO;
+    _skipLegacyImport = YES;
+    [_legacyImportURL release]; _legacyImportURL = nil;
+    [_archiveError release]; _archiveError = nil;
+    [[NSNotificationCenter defaultCenter] postNotificationName:FlycutOperatorArchiveReadyNotification object:self];
+    [self openArchive];
+    return YES;
+}
+
 -(void)seedObservedClipboard:(NSString *)text
 {
     [_observedClipboard release];
@@ -125,6 +217,7 @@ NSString * const FlycutOperatorArchiveReadyNotification = @"FlycutOperatorArchiv
     dispatch_async(dispatch_get_main_queue(), ^{
         [self->_archiveError release];
         self->_archiveError = [error retain];
+        self->_archiveOpening = NO;
         self->disableStore = YES;
         [[NSNotificationCenter defaultCenter] postNotificationName:FlycutOperatorArchiveReadyNotification object:self];
         [self delegateAlertWithMessageText:@"Archive unavailable"
@@ -135,20 +228,11 @@ NSString * const FlycutOperatorArchiveReadyNotification = @"FlycutOperatorArchiv
 
 -(void)openArchive
 {
+    _archiveOpening = YES;
     NSString *path = [[[NSProcessInfo processInfo] environment] objectForKey:@"FLYCUT_ARCHIVE_PATH"];
     if (!path.length) {
         NSString *support = [NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES) firstObject];
         path = [[support stringByAppendingPathComponent:@"net.nowaker.flycut"] stringByAppendingPathComponent:@"Archive.sqlite"];
-    }
-    NSDictionary *legacy = nil;
-    NSString *legacyPath = [[[NSProcessInfo processInfo] environment] objectForKey:@"FLYCUT_LEGACY_DEFAULTS_PATH"];
-    if (legacyPath.length) {
-        legacy = [NSDictionary dictionaryWithContentsOfFile:legacyPath];
-    } else {
-        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-        NSDictionary *fork = [defaults persistentDomainForName:@"net.nowaker.flycut"];
-        NSDictionary *upstream = [defaults persistentDomainForName:@"com.generalarcade.flycut"];
-        legacy = fork[@"store"] ? fork : upstream;
     }
     dispatch_async(_archiveQueue, ^{
         @autoreleasepool {
@@ -157,7 +241,19 @@ NSString * const FlycutOperatorArchiveReadyNotification = @"FlycutOperatorArchiv
                 [self reportArchiveFailure:error]; return;
             }
             self->_archive = [[FlycutArchive alloc] initWithPath:path error:&error];
-            if (!self->_archive || ![self->_archive migrateLegacyDefaults:legacy ?: @{} error:&error]) {
+            NSDictionary *backup = self->_archive ? [self->_archive legacyDefaultsBackup:&error] : nil;
+            BOOL migrated = backup != nil;
+            if (self->_archive && !error && !migrated) {
+                BOOL accessed = [self->_legacyImportURL startAccessingSecurityScopedResource];
+                @try {
+                    NSDictionary *legacy = self->_skipLegacyImport ? @{} :
+                        self->_legacyImportURL ? ReadLegacyDefaults(self->_legacyImportURL, &error) : [[self class] legacyDefaultsForMigration:&error];
+                    if (legacy && !error) migrated = [self->_archive migrateLegacyDefaults:legacy error:&error];
+                } @finally {
+                    if (accessed) [self->_legacyImportURL stopAccessingSecurityScopedResource];
+                }
+            }
+            if (!self->_archive || error || !migrated) {
                 [self->_archive release]; self->_archive = nil;
                 [self reportArchiveFailure:error]; return;
             }
@@ -166,6 +262,9 @@ NSString * const FlycutOperatorArchiveReadyNotification = @"FlycutOperatorArchiv
             dispatch_async(dispatch_get_main_queue(), ^{
                 self->_syncController = [[FlycutSyncController alloc] initWithArchive:self->_archive];
                 self->_archiveReady = YES;
+                self->_archiveOpening = NO;
+                self->disableStore = NO;
+                [self->_legacyImportURL release]; self->_legacyImportURL = nil;
                 [[NSNotificationCenter defaultCenter] postNotificationName:FlycutOperatorArchiveReadyNotification object:self];
                 [FlycutSyncSettingsController restoreSyncForController:self->_syncController];
             });

@@ -3,6 +3,7 @@
 #endif
 #import <Cocoa/Cocoa.h>
 #import <objc/runtime.h>
+#import <sqlite3.h>
 #import "../../FlycutOperator.h"
 #import "../../FlycutEngine/FlycutArchive.h"
 #import "../FlycutSync.h"
@@ -10,9 +11,27 @@
 static NSUserDefaults *isolatedDefaults;
 @interface NSUserDefaults (Driver)
 + (NSUserDefaults *)driverDefaults;
+- (NSDictionary *)driverPersistentDomainForName:(NSString *)name;
 @end
 @implementation NSUserDefaults (Driver)
 + (NSUserDefaults *)driverDefaults { return isolatedDefaults; }
+- (NSDictionary *)driverPersistentDomainForName:(NSString *)name {
+    if ([name isEqual:@"net.nowaker.flycut"] || [name isEqual:@"com.generalarcade.flycut"]) return nil;
+    return [self driverPersistentDomainForName:name];
+}
+@end
+
+static NSString *legacyHome;
+static NSUInteger legacyHomeLookups;
+@interface FlycutOperator (MigrationSource)
++ (NSDictionary *)legacyDefaultsInHome:(NSString *)home forkDomain:(NSDictionary *)fork upstreamDomain:(NSDictionary *)upstream sandboxed:(BOOL)sandboxed error:(NSError **)error;
++ (NSString *)legacyHomeDirectory;
+@end
+@interface FlycutOperator (MigrationDriver)
++ (NSString *)driverLegacyHomeDirectory;
+@end
+@implementation FlycutOperator (MigrationDriver)
++ (NSString *)driverLegacyHomeDirectory { ++legacyHomeLookups; return legacyHome; }
 @end
 
 @interface AppController : NSObject
@@ -48,6 +67,80 @@ static BOOL AwaitFor(NSTimeInterval seconds, BOOL (^condition)(void)) {
 static BOOL Await(BOOL (^condition)(void)) { return AwaitFor(25, condition); }
 static NSUInteger Count(FlycutOperator *operator) {
     return [[[operator archive] searchText:@"" favoritesOnly:NO groupDuplicates:NO limit:1000 cursor:nil error:NULL][@"items"] count];
+}
+
+static int MigrationMarker(NSString *path) {
+    sqlite3 *database = NULL;
+    sqlite3_stmt *statement = NULL;
+    int marker = -1;
+    if (sqlite3_open_v2(path.fileSystemRepresentation, &database, SQLITE_OPEN_READONLY, NULL) == SQLITE_OK &&
+        sqlite3_prepare_v2(database, "SELECT migrated FROM archive_meta WHERE singleton=1", -1, &statement, NULL) == SQLITE_OK && sqlite3_step(statement) == SQLITE_ROW)
+        marker = sqlite3_column_int(statement, 0);
+    sqlite3_finalize(statement);
+    sqlite3_close(database);
+    return marker;
+}
+
+static void ExerciseContainerMigration(NSString *root, NSDictionary *raw) {
+    NSError *error = nil;
+    NSFileManager *files = NSFileManager.defaultManager;
+    legacyHome = [root stringByAppendingPathComponent:@"legacy-account-home"];
+    NSString *containerPath = [legacyHome stringByAppendingPathComponent:@"Library/Containers/com.generalarcade.flycut/Data/Library/Preferences/com.generalarcade.flycut.plist"];
+    [files createDirectoryAtPath:containerPath.stringByDeletingLastPathComponent withIntermediateDirectories:YES attributes:nil error:NULL];
+    Check([raw writeToFile:containerPath atomically:YES], "synthetic App Store container preferences created");
+    Check([[FlycutOperator legacyDefaultsInHome:legacyHome forkDomain:nil upstreamDomain:nil sandboxed:NO error:&error] isEqual:raw], "production known-container path selects entire uncapped raw plist");
+    error = nil;
+    Check([FlycutOperator legacyDefaultsInHome:legacyHome forkDomain:nil upstreamDomain:nil sandboxed:YES error:&error] == nil && error != nil, "sandbox lookup requires explicit read grant instead of inferring another container access");
+    error = nil;
+    Check([[FlycutOperator legacyDefaultsInHome:legacyHome forkDomain:raw upstreamDomain:nil sandboxed:YES error:&error] isEqual:raw], "existing fork legacy domain remains authoritative in sandbox");
+    [files setAttributes:@{NSFilePosixPermissions:@0} ofItemAtPath:containerPath error:NULL];
+    NSDictionary *denied = [FlycutOperator legacyDefaultsInHome:legacyHome forkDomain:nil upstreamDomain:nil sandboxed:NO error:&error];
+    [files setAttributes:@{NSFilePosixPermissions:@0600} ofItemAtPath:containerPath error:NULL];
+    Check(denied == nil && error != nil, "unreadable existing container is not interpreted as absent history");
+    error = nil;
+    NSDictionary *other = @{@"store":@{@"jcList":@[], @"favoritesList":@[]}};
+    Check([FlycutOperator legacyDefaultsInHome:legacyHome forkDomain:nil upstreamDomain:other sandboxed:NO error:&error] == nil && error != nil, "distinct regular and container histories require an explicit source decision");
+    error = nil;
+    Check([FlycutOperator legacyDefaultsInHome:legacyHome forkDomain:other upstreamDomain:nil sandboxed:NO error:&error] == nil && error != nil, "empty fork defaults cannot silently hide existing App Store container history");
+    error = nil;
+    Check([FlycutOperator legacyDefaultsInHome:legacyHome forkDomain:other upstreamDomain:nil sandboxed:YES error:&error] == nil && error != nil, "empty fork defaults cannot bypass a sandbox legacy-read decision");
+    method_exchangeImplementations(class_getClassMethod(FlycutOperator.class, @selector(legacyHomeDirectory)), class_getClassMethod(FlycutOperator.class, @selector(driverLegacyHomeDirectory)));
+    method_exchangeImplementations(class_getInstanceMethod(NSUserDefaults.class, @selector(persistentDomainForName:)), class_getInstanceMethod(NSUserDefaults.class, @selector(driverPersistentDomainForName:)));
+    unsetenv("FLYCUT_LEGACY_DEFAULTS_PATH");
+    NSString *archivePath = [root stringByAppendingPathComponent:@"container-import.sqlite"];
+    setenv("FLYCUT_ARCHIVE_PATH", archivePath.UTF8String, 1);
+    FlycutOperator *container = [[FlycutOperator alloc] init];
+    [container awakeFromNibDisplaying:10 withDisplayLength:30 withSaveSelector:NULL forTarget:nil];
+    Check(Await(^BOOL{ return [container archive] != nil && [container jcListCount] > 0; }) && Count(container) == 8, "actual startup lookup imports all container history without raw-file override");
+    Check([[[container archive] legacyDefaultsBackup:NULL] isEqual:raw] && MigrationMarker(archivePath) == 1, "raw container backup and migration marker commit together");
+    [container applicationWillTerminate];
+    NSUInteger previousLookups = legacyHomeLookups;
+    [@"invalid plist" writeToFile:containerPath atomically:YES encoding:NSUTF8StringEncoding error:NULL];
+    FlycutOperator *reopened = [[FlycutOperator alloc] init];
+    [reopened awakeFromNibDisplaying:10 withDisplayLength:30 withSaveSelector:NULL forTarget:nil];
+    Check(Await(^BOOL{ return [reopened archive] != nil; }) && Count(reopened) == 8 && legacyHomeLookups == previousLookups, "already-migrated startup never rereads inaccessible or changed upstream stores");
+    [reopened applicationWillTerminate];
+    NSString *blockedPath = [root stringByAppendingPathComponent:@"blocked-container.sqlite"];
+    setenv("FLYCUT_ARCHIVE_PATH", blockedPath.UTF8String, 1);
+    FlycutOperator *blocked = [[FlycutOperator alloc] init];
+    [blocked awakeFromNibDisplaying:10 withDisplayLength:30 withSaveSelector:NULL forTarget:nil];
+    Check(Await(^BOOL{ return [blocked archiveError] != nil; }) && [blocked archive] == nil && MigrationMarker(blockedPath) == 0, "invalid existing container blocks startup without committing an empty migration");
+    NSString *selected = [root stringByAppendingPathComponent:@"user-selected-legacy.plist"];
+    [raw writeToFile:selected atomically:YES];
+    Check([blocked importLegacyDefaultsFromURL:[NSURL fileURLWithPath:selected]], "read-granted explicit legacy selection queues migration retry");
+    Check(Await(^BOOL{ return [blocked archive] != nil && ![blocked storeDisabled]; }) && Count(blocked) == 8 && MigrationMarker(blockedPath) == 1, "selected-source retry commits uncapped history and re-enables durable capture");
+    Check([[[blocked archive] legacyDefaultsBackup:NULL] isEqual:raw], "selected-source raw backup is retained unchanged");
+    [blocked applicationWillTerminate];
+    NSString *emptyPath = [root stringByAppendingPathComponent:@"explicit-new-archive.sqlite"];
+    setenv("FLYCUT_ARCHIVE_PATH", emptyPath.UTF8String, 1);
+    FlycutOperator *empty = [[FlycutOperator alloc] init];
+    [empty awakeFromNibDisplaying:10 withDisplayLength:30 withSaveSelector:NULL forTarget:nil];
+    Check(Await(^BOOL{ return [empty archiveError] != nil; }) && MigrationMarker(emptyPath) == 0, "unreadable source remains unmarked before explicit new-archive choice");
+    Check([empty startArchiveWithoutLegacyImport], "explicit no-import decision queues a new archive");
+    Check(Await(^BOOL{ return [empty archive] != nil; }) && Count(empty) == 0 && MigrationMarker(emptyPath) == 1, "only explicit new-archive choice commits empty migration");
+    [empty applicationWillTerminate];
+    method_exchangeImplementations(class_getClassMethod(FlycutOperator.class, @selector(legacyHomeDirectory)), class_getClassMethod(FlycutOperator.class, @selector(driverLegacyHomeDirectory)));
+    method_exchangeImplementations(class_getInstanceMethod(NSUserDefaults.class, @selector(persistentDomainForName:)), class_getInstanceMethod(NSUserDefaults.class, @selector(driverPersistentDomainForName:)));
 }
 
 static void RunLiveOperator(NSString *root, NSString *url, NSString *collection, NSString *credentialFile, NSString *marker) {
@@ -217,6 +310,7 @@ int main(int argc, const char **argv) {
         Check(Await(^BOOL{ return [failed archiveError] != nil; }) && [failed storeDisabled] && [failed jcListCount] == 0, "storage failure disables capture without writable legacy fallback");
         Check(![failed addClipping:@"must not enter legacy fallback" ofType:@"text/plain" fromApp:nil withAppBundleURL:nil target:nil clippingAddedSelector:NULL], "failed storage cannot report accepted capture");
         [failed applicationWillTerminate];
+        ExerciseContainerMigration(root, raw);
         [isolatedDefaults removePersistentDomainForName:suite];
         printf("PASS %lu operator checks; async migration/capture, stable favorites, local suppression, bounded projection and no defaults history writes; no clipboard accessed\n", (unsigned long)checks);
     }

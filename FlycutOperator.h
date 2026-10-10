@@ -56,6 +56,9 @@ extern NSString * const FlycutOperatorArchiveReadyNotification;
 -(FlycutSyncController *)syncController;
 -(NSError *)archiveError;
 -(void)seedObservedClipboard:(NSString *)text;
++(NSDictionary *)legacyDefaultsForMigration:(NSError **)error;
+-(BOOL)importLegacyDefaultsFromURL:(NSURL *)url;
+-(BOOL)startArchiveWithoutLegacyImport;
 #endif
 
 // Basic functionality
