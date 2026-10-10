@@ -82,6 +82,8 @@ typedef NS_ENUM(NSInteger, FlycutArchiveErrorCode) {
 // Pass the RAW legacy persistent-domain dictionary (not a capped FlycutStore).
 // Reads store.jcList/favoritesList; stores the entire raw property-list backup
 // in SQLite atomically with import and the migration marker. Idempotent.
+// Matched favorites inherit history recency; unmatched favorites retain their
+// relative order. One item cannot preserve two conflicting legacy list orders.
 // Caller stops legacy defaults history writes after this succeeds. Never uses
 // standardUserDefaults or writes either app's persistent domain.
 - (BOOL)migrateLegacyDefaults:(NSDictionary *)defaults error:(NSError **)error;
