@@ -5,8 +5,8 @@
 #ifdef __OBJC__
 #import <Cocoa/Cocoa.h>
 
-#define kiCloudId @"iCloud.com.generalarcade.flycut"
-#define kFlycutHelperId @"com.generalarcade.flycuthelper"
+#define kiCloudId @FLYCUT_ICLOUD_CONTAINER
+#define kFlycutHelperId @"net.nowaker.flycuthelper"
 
 // The SANDBOXING flag isn't tightly coupled with the sandboxing entitlement, so this amounts to more of a code policy flag than a feature availability flag at the moment. [AppController isAppSandboxed] is more effective for feature availability checks.
 //#define SANDBOXING

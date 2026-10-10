@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		6FABC0000000000000000101 /* FlycutSync.m in Sources */ = {isa = PBXBuildFile; fileRef = 6FABC0000000000000000201 /* FlycutSync.m */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
+		6FABC0000000000000000102 /* FlycutFolderSync.m in Sources */ = {isa = PBXBuildFile; fileRef = 6FABC0000000000000000202 /* FlycutFolderSync.m */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
+		6FABC0000000000000000103 /* FlycutServerSync.m in Sources */ = {isa = PBXBuildFile; fileRef = 6FABC0000000000000000203 /* FlycutServerSync.m */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
+		6FABC0000000000000000104 /* FlycutCloudKitSync.m in Sources */ = {isa = PBXBuildFile; fileRef = 6FABC0000000000000000204 /* FlycutCloudKitSync.m */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
+		6FABC0000000000000000105 /* FlycutSyncSettingsController.m in Sources */ = {isa = PBXBuildFile; fileRef = 6FABC0000000000000000205 /* FlycutSyncSettingsController.m */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
+		6FABC0000000000000000106 /* FlycutArchive.m in Sources */ = {isa = PBXBuildFile; fileRef = 6FABC0000000000000000206 /* FlycutArchive.m */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
 		77192A2A23D6EA7A00EDB9BC /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 77192A2923D6EA7A00EDB9BC /* AppDelegate.m */; };
 		77192A2C23D6EA7B00EDB9BC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 77192A2B23D6EA7B00EDB9BC /* Assets.xcassets */; };
 		77192A2F23D6EA7B00EDB9BC /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 77192A2D23D6EA7B00EDB9BC /* MainMenu.xib */; };
@@ -59,8 +65,6 @@
 		77A4F3B3139BD72300F39666 /* SGKeyCombo.h in Headers */ = {isa = PBXBuildFile; fileRef = 77A4F3AB139BD72300F39666 /* SGKeyCombo.h */; };
 		77A4F3B4139BD72300F39666 /* SGKeyCombo.m in Sources */ = {isa = PBXBuildFile; fileRef = 77A4F3AC139BD72300F39666 /* SGKeyCombo.m */; };
 		77AE72BD23CAE81A00F6A44B /* ApplicationServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 77AE72BC23CAE81A00F6A44B /* ApplicationServices.framework */; };
-		77AE730623D2D49100F6A44B /* MJCloudKitUserDefaultsSync.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8DF82B3B2098F9CA00E2A1B9 /* MJCloudKitUserDefaultsSync.framework */; };
-		77AE730723D2D49100F6A44B /* MJCloudKitUserDefaultsSync.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 8DF82B3B2098F9CA00E2A1B9 /* MJCloudKitUserDefaultsSync.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		77DA6B921CB9549B0077917F /* FlycutStore.m in Sources */ = {isa = PBXBuildFile; fileRef = 77DA6B8E1CB9549B0077917F /* FlycutStore.m */; };
 		77DA6B931CB9549B0077917F /* FlycutStore.h in Headers */ = {isa = PBXBuildFile; fileRef = 77DA6B8F1CB9549B0077917F /* FlycutStore.h */; };
 		77DA6B941CB9549B0077917F /* FlycutClipping.m in Sources */ = {isa = PBXBuildFile; fileRef = 77DA6B901CB9549B0077917F /* FlycutClipping.m */; };
@@ -91,7 +95,6 @@
 		8D2E28881B0669F500AE62C8 /* com.generalarcade.flycut.xout.16.png in Resources */ = {isa = PBXBuildFile; fileRef = 8D2E28841B0669F500AE62C8 /* com.generalarcade.flycut.xout.16.png */; };
 		8D2E28891B0669F500AE62C8 /* com.generalarcade.flycut.xout.32.png in Resources */ = {isa = PBXBuildFile; fileRef = 8D2E28851B0669F500AE62C8 /* com.generalarcade.flycut.xout.32.png */; };
 		8D84B63B1F7412E600DB58F9 /* CloudKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D84B63A1F7412E600DB58F9 /* CloudKit.framework */; };
-		8DC9C99C1F742115003BE8B5 /* CloudKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8DC9C99B1F742115003BE8B5 /* CloudKit.framework */; };
 		8DCE82681F4550AA00124117 /* MGSwipeTableCell.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D0DC8571F3D682800A2A8AF /* MGSwipeTableCell.framework */; };
 		8DCE82691F4550AA00124117 /* MGSwipeTableCell.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 8D0DC8571F3D682800A2A8AF /* MGSwipeTableCell.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		8DF82B3E2098FA4F00E2A1B9 /* MJCloudKitUserDefaultsSync.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8DF82B3B2098F9CA00E2A1B9 /* MJCloudKitUserDefaultsSync.framework */; };
@@ -200,17 +203,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		77AE730823D2D49100F6A44B /* Embed Frameworks */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 10;
-			files = (
-				77AE730723D2D49100F6A44B /* MJCloudKitUserDefaultsSync.framework in Embed Frameworks */,
-			);
-			name = "Embed Frameworks";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		8DCE826C1F4550AA00124117 /* Embed Frameworks */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -227,6 +219,14 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		6FABC0000000000000000201 /* FlycutSync.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = FlycutSync.m; path = Sync/FlycutSync.m; sourceTree = SOURCE_ROOT; };
+		6FABC0000000000000000202 /* FlycutFolderSync.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = FlycutFolderSync.m; path = Sync/FlycutFolderSync.m; sourceTree = SOURCE_ROOT; };
+		6FABC0000000000000000203 /* FlycutServerSync.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = FlycutServerSync.m; path = Sync/FlycutServerSync.m; sourceTree = SOURCE_ROOT; };
+		6FABC0000000000000000204 /* FlycutCloudKitSync.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = FlycutCloudKitSync.m; path = Sync/FlycutCloudKitSync.m; sourceTree = SOURCE_ROOT; };
+		6FABC0000000000000000205 /* FlycutSyncSettingsController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = FlycutSyncSettingsController.m; path = Sync/FlycutSyncSettingsController.m; sourceTree = SOURCE_ROOT; };
+		6FABC0000000000000000206 /* FlycutArchive.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = FlycutArchive.m; path = FlycutEngine/FlycutArchive.m; sourceTree = SOURCE_ROOT; };
+		6FABC0000000000000000207 /* FlycutMac.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = FlycutMac.xcconfig; path = Build/FlycutMac.xcconfig; sourceTree = SOURCE_ROOT; };
+		6FABC0000000000000000208 /* FlycutCloudKit.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = FlycutCloudKit.entitlements; path = Build/FlycutCloudKit.entitlements; sourceTree = SOURCE_ROOT; };
 		1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = /System/Library/Frameworks/Cocoa.framework; sourceTree = "<absolute>"; };
 		13E42FB307B3F0F600E4EEF1 /* CoreData.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreData.framework; path = /System/Library/Frameworks/CoreData.framework; sourceTree = "<absolute>"; };
 		29B97316FDCFA39411CA2CEA /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
@@ -328,7 +328,6 @@
 		8D61FD581F7961D200BD4B3D /* UserNotifications.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UserNotifications.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS10.2.sdk/System/Library/Frameworks/UserNotifications.framework; sourceTree = DEVELOPER_DIR; };
 		8D84B6361F72FBA900DB58F9 /* Flycut.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Flycut.entitlements; sourceTree = "<group>"; };
 		8D84B63A1F7412E600DB58F9 /* CloudKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CloudKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS10.2.sdk/System/Library/Frameworks/CloudKit.framework; sourceTree = DEVELOPER_DIR; };
-		8DC9C99B1F742115003BE8B5 /* CloudKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CloudKit.framework; path = System/Library/Frameworks/CloudKit.framework; sourceTree = SDKROOT; };
 		8DF82B332098F9CA00E2A1B9 /* MJCloudKitUserDefaultsSync.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = MJCloudKitUserDefaultsSync.xcodeproj; path = MJCloudKitUserDefaultsSync/MJCloudKitUserDefaultsSync.xcodeproj; sourceTree = "<group>"; };
 		AABE497A09FF9CD000A6A239 /* AppController.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = AppController.h; sourceTree = "<group>"; };
 		AABE497B09FF9CD000A6A239 /* AppController.m */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.objc; path = AppController.m; sourceTree = "<group>"; };
@@ -375,17 +374,30 @@
 			buildActionMask = 2147483647;
 			files = (
 				77AE72BD23CAE81A00F6A44B /* ApplicationServices.framework in Frameworks */,
-				8DC9C99C1F742115003BE8B5 /* CloudKit.framework in Frameworks */,
 				8D11072F0486CEB800E47090 /* Cocoa.framework in Frameworks */,
 				77192A3823D6EADF00EDB9BC /* ServiceManagement.framework in Frameworks */,
 				AAFAC85F0A1BD9DD00DC6025 /* Carbon.framework in Frameworks */,
-				77AE730623D2D49100F6A44B /* MJCloudKitUserDefaultsSync.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		6FABC0000000000000000301 /* Mac Sync */ = {
+			isa = PBXGroup;
+			children = (
+				6FABC0000000000000000201 /* FlycutSync.m */,
+				6FABC0000000000000000202 /* FlycutFolderSync.m */,
+				6FABC0000000000000000203 /* FlycutServerSync.m */,
+				6FABC0000000000000000204 /* FlycutCloudKitSync.m */,
+				6FABC0000000000000000205 /* FlycutSyncSettingsController.m */,
+				6FABC0000000000000000206 /* FlycutArchive.m */,
+				6FABC0000000000000000207 /* FlycutMac.xcconfig */,
+				6FABC0000000000000000208 /* FlycutCloudKit.entitlements */,
+			);
+			name = "Mac Sync";
+			sourceTree = "<group>";
+		};
 		080E96DDFE201D6D7F000001 /* Classes */ = {
 			isa = PBXGroup;
 			children = (
@@ -441,6 +453,7 @@
 		29B97314FDCFA39411CA2CEA /* Jumpcut */ = {
 			isa = PBXGroup;
 			children = (
+				6FABC0000000000000000301 /* Mac Sync */,
 				77192A1E23D4376200EDB9BC /* FlycutDebug.entitlements */,
 				8D84B6361F72FBA900DB58F9 /* Flycut.entitlements */,
 				7794D3D4139BF28B0047E862 /* flycut.icns */,
@@ -501,7 +514,6 @@
 				77192A3723D6EADF00EDB9BC /* ServiceManagement.framework */,
 				77AE72BC23CAE81A00F6A44B /* ApplicationServices.framework */,
 				8D61FD581F7961D200BD4B3D /* UserNotifications.framework */,
-				8DC9C99B1F742115003BE8B5 /* CloudKit.framework */,
 				8D84B63A1F7412E600DB58F9 /* CloudKit.framework */,
 				1058C7A0FEA54F0111CA2CBB /* Linked Frameworks */,
 				1058C7A2FEA54F0111CA2CBB /* Other Frameworks */,
@@ -780,7 +792,6 @@
 				8D11072C0486CEB800E47090 /* Sources */,
 				8D11072E0486CEB800E47090 /* Frameworks */,
 				AAE2036C0A27B2B9002DCC2A /* Headers */,
-				77AE730823D2D49100F6A44B /* Embed Frameworks */,
 				77192A3923D6F45F00EDB9BC /* CopyFiles */,
 				8D60A1BA1BC8399900A26CBF /* Set meaningful build number */,
 			);
@@ -819,7 +830,6 @@
 				TargetAttributes = {
 					77192A2523D6EA7A00EDB9BC = {
 						CreatedOnToolsVersion = 11.3;
-						DevelopmentTeam = S8JLSG5ES7;
 						ProvisioningStyle = Automatic;
 					};
 					8D0C11A41F171B140046FAA0 = {
@@ -849,7 +859,6 @@
 						TestTargetID = 8D0C11A41F171B140046FAA0;
 					};
 					8D1107260486CEB800E47090 = {
-						DevelopmentTeam = S8JLSG5ES7;
 						ProvisioningStyle = Automatic;
 						SystemCapabilities = {
 							com.apple.Push = {
@@ -859,7 +868,7 @@
 								enabled = 0;
 							};
 							com.apple.iCloud = {
-								enabled = 1;
+								enabled = 0;
 							};
 						};
 					};
@@ -1075,6 +1084,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6FABC0000000000000000101 /* FlycutSync.m in Sources */,
+				6FABC0000000000000000102 /* FlycutFolderSync.m in Sources */,
+				6FABC0000000000000000103 /* FlycutServerSync.m in Sources */,
+				6FABC0000000000000000104 /* FlycutCloudKitSync.m in Sources */,
+				6FABC0000000000000000105 /* FlycutSyncSettingsController.m in Sources */,
+				6FABC0000000000000000106 /* FlycutArchive.m in Sources */,
 				8D11072D0486CEB800E47090 /* main.m in Sources */,
 				AABE497C09FF9CD000A6A239 /* AppController.m in Sources */,
 				77A4F3AE139BD72300F39666 /* SGHotKey.m in Sources */,
@@ -1195,12 +1210,11 @@
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CODE_SIGN_ENTITLEMENTS = FlycutHelper/FlycutHelper.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = S8JLSG5ES7;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
@@ -1216,7 +1230,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 10.13;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = com.generalarcade.flycuthelper;
+				PRODUCT_BUNDLE_IDENTIFIER = net.nowaker.flycuthelper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 			};
@@ -1239,12 +1253,11 @@
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CODE_SIGN_ENTITLEMENTS = FlycutHelper/FlycutHelper.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = S8JLSG5ES7;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_NS_ASSERTIONS = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -1255,7 +1268,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 10.13;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = com.generalarcade.flycuthelper;
+				PRODUCT_BUNDLE_IDENTIFIER = net.nowaker.flycuthelper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SKIP_INSTALL = YES;
@@ -1615,15 +1628,15 @@
 		};
 		C01FCF4B08A954540054247B /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 6FABC0000000000000000207 /* FlycutMac.xcconfig */;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = YES;
-				CODE_SIGN_ENTITLEMENTS = FlycutDebug.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 9;
-				DEVELOPMENT_TEAM = S8JLSG5ES7;
 				ENABLE_HARDENED_RUNTIME = YES;
+				FLYCUT_ENTITLEMENTS_SUFFIX = Debug;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(FRAMEWORK_SEARCH_PATHS)",
 					"$(SRCROOT)",
@@ -1634,15 +1647,15 @@
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = Flycut_Prefix.pch;
 				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
 					DEBUG,
-					FLYCUT_MAC,
 				);
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = /Applications;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 10.13;
 				MARKETING_VERSION = 1.9.7;
-				PRODUCT_BUNDLE_IDENTIFIER = com.generalarcade.flycut;
+				PRODUCT_BUNDLE_IDENTIFIER = net.nowaker.flycut;
 				PRODUCT_NAME = Flycut;
 				PROVISIONING_PROFILE = "";
 				WRAPPER_EXTENSION = app;
@@ -1652,14 +1665,13 @@
 		};
 		C01FCF4C08A954540054247B /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 6FABC0000000000000000207 /* FlycutMac.xcconfig */;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = YES;
-				CODE_SIGN_ENTITLEMENTS = Flycut.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 9;
-				DEVELOPMENT_TEAM = S8JLSG5ES7;
 				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(FRAMEWORK_SEARCH_PATHS)",
@@ -1669,14 +1681,12 @@
 				GCC_MODEL_TUNING = G5;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = Flycut_Prefix.pch;
-				GCC_PREPROCESSOR_DEFINITIONS = FLYCUT_MAC;
-				"GCC_PREPROCESSOR_DEFINITIONS[arch=*]" = "";
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = /Applications;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 10.13;
 				MARKETING_VERSION = 1.9.7;
-				PRODUCT_BUNDLE_IDENTIFIER = com.generalarcade.flycut;
+				PRODUCT_BUNDLE_IDENTIFIER = net.nowaker.flycut;
 				PRODUCT_NAME = Flycut;
 				PROVISIONING_PROFILE = "";
 				STRIP_INSTALLED_PRODUCT = YES;
