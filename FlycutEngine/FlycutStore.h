@@ -63,6 +63,8 @@
 -(void) setDisplayLen:(int)newDisplayLength;
 -(void) clearModifiedSinceLastSaveStore;
 -(void) pruneJournals;
+// Projection eviction must never emit durable deletion callbacks or journals.
+-(void) replaceProjection:(NSArray<FlycutClipping *> *)clippings;
 -(void) clearInsertionJournalCount:(NSUInteger)count;
 -(void) clearDeletionJournalCount:(NSUInteger)count;
 

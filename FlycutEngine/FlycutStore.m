@@ -425,6 +425,25 @@
 		[self.delegate beginUpdates];
 }
 
+-(void) replaceProjection:(NSArray<FlycutClipping *> *)clippings
+{
+    [self delegateBeginUpdates];
+    for (NSInteger index = jcList.count - 1; index >= 0; --index) {
+        [jcList removeObjectAtIndex:(NSUInteger)index];
+        [self delegateDeleteClippingAtIndex:(int)index];
+    }
+    NSUInteger count = MIN(clippings.count, (NSUInteger)MAX(1, jcRememberNum));
+    for (NSUInteger index = 0; index < count; ++index) {
+        [jcList addObject:clippings[index]];
+        if (self.delegate && [self.delegate respondsToSelector:@selector(insertClippingAtIndex:)])
+            [self.delegate insertClippingAtIndex:(int)index];
+    }
+    [insertionJournal removeAllObjects];
+    [deletionJournal removeAllObjects];
+    modifiedSinceLastSaveStore = NO;
+    [self delegateEndUpdates];
+}
+
 -(void) delegateEndUpdates
 {
 	if ( self.delegate && [self.delegate respondsToSelector:@selector(endUpdates)] )
