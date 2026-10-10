@@ -1,0 +1,66 @@
+{
+  "protocol": "net.nowaker.flycut.events",
+  "version": 1,
+  "collection_id": "10000000-0000-0000-0000-000000000001",
+  "cases": [
+    {
+      "name": "precreate-registers-ties-and-permanent-delete",
+      "events": [
+        {"protocol":"net.nowaker.flycut.events","version":1,"collection_id":"10000000-0000-0000-0000-000000000001","event_id":"20000000-0000-0000-0000-000000000001","device_id":"30000000-0000-0000-0000-000000000001","clock":"1","op":"create","item_id":"20000000-0000-0000-0000-000000000001","payload":{"text":"exact\ntext 😀","content_type":"text/plain","captured_at_ms":null,"source_app":null,"source_id":null,"favorite":false}},
+        {"protocol":"net.nowaker.flycut.events","version":1,"collection_id":"10000000-0000-0000-0000-000000000001","event_id":"20000000-0000-0000-0000-000000000002","device_id":"30000000-0000-0000-0000-000000000001","clock":"7","op":"favorite","item_id":"20000000-0000-0000-0000-000000000001","payload":{"value":true}},
+        {"protocol":"net.nowaker.flycut.events","version":1,"collection_id":"10000000-0000-0000-0000-000000000001","event_id":"20000000-0000-0000-0000-000000000003","device_id":"30000000-0000-0000-0000-000000000002","clock":"7","op":"favorite","item_id":"20000000-0000-0000-0000-000000000001","payload":{"value":false}},
+        {"protocol":"net.nowaker.flycut.events","version":1,"collection_id":"10000000-0000-0000-0000-000000000001","event_id":"20000000-0000-0000-0000-000000000004","device_id":"30000000-0000-0000-0000-000000000002","clock":"7","op":"favorite","item_id":"20000000-0000-0000-0000-000000000001","payload":{"value":true}},
+        {"protocol":"net.nowaker.flycut.events","version":1,"collection_id":"10000000-0000-0000-0000-000000000001","event_id":"20000000-0000-0000-0000-000000000005","device_id":"30000000-0000-0000-0000-000000000001","clock":"9007199254740993","op":"touch","item_id":"20000000-0000-0000-0000-000000000001","payload":{}},
+        {"protocol":"net.nowaker.flycut.events","version":1,"collection_id":"10000000-0000-0000-0000-000000000001","event_id":"20000000-0000-0000-0000-000000000006","device_id":"30000000-0000-0000-0000-000000000001","clock":"2","op":"create","item_id":"20000000-0000-0000-0000-000000000006","payload":{"text":"same text","content_type":"text/plain","captured_at_ms":-1,"source_app":"Synthetic","source_id":"test.app","favorite":true}},
+        {"protocol":"net.nowaker.flycut.events","version":1,"collection_id":"10000000-0000-0000-0000-000000000001","event_id":"20000000-0000-0000-0000-000000000007","device_id":"30000000-0000-0000-0000-000000000001","clock":"1","op":"delete","item_id":"20000000-0000-0000-0000-000000000006","payload":{}},
+        {"protocol":"net.nowaker.flycut.events","version":1,"collection_id":"10000000-0000-0000-0000-000000000001","event_id":"20000000-0000-0000-0000-000000000008","device_id":"30000000-0000-0000-0000-000000000002","clock":"100","op":"touch","item_id":"20000000-0000-0000-0000-000000000006","payload":{}},
+        {"protocol":"net.nowaker.flycut.events","version":1,"collection_id":"10000000-0000-0000-0000-000000000001","event_id":"20000000-0000-0000-0000-000000000009","device_id":"30000000-0000-0000-0000-000000000001","clock":"3","op":"create","item_id":"20000000-0000-0000-0000-000000000009","payload":{"text":"same text","content_type":"text/plain","captured_at_ms":9223372036854775807,"source_app":"","source_id":null,"favorite":false}}
+      ],
+      "deliveries": [[0,1,2,3,4,5,6,7,8], [7,6,4,3,2,1,8,5,0], [3,3,2,1,7,6,8,4,5,0,0]],
+      "expected_items": [
+        {"item_id":"20000000-0000-0000-0000-000000000001","text":"exact\ntext 😀","content_type":"text/plain","captured_at_ms":null,"source_app":null,"source_id":null,"favorite":true,"recent_clock":"9007199254740993","recent_device":"30000000-0000-0000-0000-000000000001","recent_event":"20000000-0000-0000-0000-000000000005"},
+        {"item_id":"20000000-0000-0000-0000-000000000009","text":"same text","content_type":"text/plain","captured_at_ms":9223372036854775807,"source_app":"","source_id":null,"favorite":false,"recent_clock":"3","recent_device":"30000000-0000-0000-0000-000000000001","recent_event":"20000000-0000-0000-0000-000000000009"}
+      ],
+      "expected_hidden_ids": ["20000000-0000-0000-0000-000000000006"],
+      "expected_event_count": 9
+    },
+    {
+      "name": "recency-ties-and-create-favorite-register",
+      "events": [
+        {"protocol":"net.nowaker.flycut.events","version":1,"collection_id":"10000000-0000-0000-0000-000000000001","event_id":"40000000-0000-0000-0000-000000000001","device_id":"30000000-0000-0000-0000-000000000001","clock":"10","op":"create","item_id":"40000000-0000-0000-0000-000000000001","payload":{"text":"duplicate","content_type":"text/plain","captured_at_ms":0,"source_app":null,"source_id":null,"favorite":true}},
+        {"protocol":"net.nowaker.flycut.events","version":1,"collection_id":"10000000-0000-0000-0000-000000000001","event_id":"40000000-0000-0000-0000-000000000002","device_id":"30000000-0000-0000-0000-000000000001","clock":"10","op":"create","item_id":"40000000-0000-0000-0000-000000000002","payload":{"text":"duplicate","content_type":"text/plain","captured_at_ms":null,"source_app":null,"source_id":null,"favorite":false}},
+        {"protocol":"net.nowaker.flycut.events","version":1,"collection_id":"10000000-0000-0000-0000-000000000001","event_id":"40000000-0000-0000-0000-000000000003","device_id":"30000000-0000-0000-0000-000000000002","clock":"10","op":"touch","item_id":"40000000-0000-0000-0000-000000000001","payload":{}},
+        {"protocol":"net.nowaker.flycut.events","version":1,"collection_id":"10000000-0000-0000-0000-000000000001","event_id":"40000000-0000-0000-0000-000000000004","device_id":"30000000-0000-0000-0000-000000000002","clock":"10","op":"touch","item_id":"40000000-0000-0000-0000-000000000002","payload":{}},
+        {"protocol":"net.nowaker.flycut.events","version":1,"collection_id":"10000000-0000-0000-0000-000000000001","event_id":"40000000-0000-0000-0000-000000000005","device_id":"30000000-0000-0000-0000-000000000001","clock":"9","op":"favorite","item_id":"40000000-0000-0000-0000-000000000001","payload":{"value":false}}
+      ],
+      "deliveries": [[0,1,2,3,4], [4,3,2,1,0], [2,4,0,3,1,4]],
+      "expected_items": [
+        {"item_id":"40000000-0000-0000-0000-000000000002","text":"duplicate","content_type":"text/plain","captured_at_ms":null,"source_app":null,"source_id":null,"favorite":false,"recent_clock":"10","recent_device":"30000000-0000-0000-0000-000000000002","recent_event":"40000000-0000-0000-0000-000000000004"},
+        {"item_id":"40000000-0000-0000-0000-000000000001","text":"duplicate","content_type":"text/plain","captured_at_ms":0,"source_app":null,"source_id":null,"favorite":true,"recent_clock":"10","recent_device":"30000000-0000-0000-0000-000000000002","recent_event":"40000000-0000-0000-0000-000000000003"}
+      ],
+      "expected_hidden_ids": [],
+      "expected_event_count": 5
+    }
+  ],
+  "invalid_variants": [
+    {"name":"unknown-version","base_case":0,"base_event":0,"replace":{"version":2}},
+    {"name":"boolean-version","base_case":0,"base_event":0,"replace":{"version":true}},
+    {"name":"unknown-operation","base_case":0,"base_event":0,"replace":{"op":"undelete"}},
+    {"name":"zero-clock","base_case":0,"base_event":0,"replace":{"clock":"0"}},
+    {"name":"overflow-clock","base_case":0,"base_event":0,"replace":{"clock":"9223372036854775808"}},
+    {"name":"numeric-clock","base_case":0,"base_event":0,"replace":{"clock":1}},
+    {"name":"nondecimal-clock","base_case":0,"base_event":0,"replace":{"clock":"1e3"}},
+    {"name":"uppercase-uuid","base_case":0,"base_event":0,"replace":{"device_id":"ABCDEF00-0000-0000-0000-000000000001"}},
+    {"name":"create-id-mismatch","base_case":0,"base_event":0,"replace":{"item_id":"20000000-0000-0000-0000-000000000099"}},
+    {"name":"extra-envelope-field","base_case":0,"base_event":0,"replace":{"unexpected":true}},
+    {"name":"empty-text","base_case":0,"base_event":0,"payload_replace":{"text":""}},
+    {"name":"nonplain-content","base_case":0,"base_event":0,"payload_replace":{"content_type":"text/html"}},
+    {"name":"boolean-timestamp","base_case":0,"base_event":0,"payload_replace":{"captured_at_ms":true}},
+    {"name":"fractional-timestamp","base_case":0,"base_event":0,"payload_replace":{"captured_at_ms":1.5}},
+    {"name":"overflow-timestamp","base_case":0,"base_event":0,"payload_replace":{"captured_at_ms":9223372036854775808}},
+    {"name":"numeric-favorite","base_case":0,"base_event":0,"payload_replace":{"favorite":1}},
+    {"name":"nonstring-source","base_case":0,"base_event":0,"payload_replace":{"source_app":1}},
+    {"name":"extra-payload-field","base_case":0,"base_event":0,"payload_replace":{"unexpected":true}},
+    {"name":"touch-payload","base_case":0,"base_event":4,"payload_replace":{"value":true}}
+  ]
+}
