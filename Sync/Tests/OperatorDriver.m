@@ -143,6 +143,46 @@ static void ExerciseContainerMigration(NSString *root, NSDictionary *raw) {
     method_exchangeImplementations(class_getInstanceMethod(NSUserDefaults.class, @selector(persistentDomainForName:)), class_getInstanceMethod(NSUserDefaults.class, @selector(driverPersistentDomainForName:)));
 }
 
+static void ExerciseStaleSelections(NSString *root) {
+    NSString *empty = [root stringByAppendingPathComponent:@"stale-empty.plist"];
+    [@{} writeToFile:empty atomically:YES];
+    setenv("FLYCUT_LEGACY_DEFAULTS_PATH", empty.UTF8String, 1);
+    setenv("FLYCUT_ARCHIVE_PATH", [root stringByAppendingPathComponent:@"stale-selections.sqlite"].UTF8String, 1);
+    FlycutOperator *operator = [[FlycutOperator alloc] init];
+    [operator awakeFromNibDisplaying:10 withDisplayLength:30 withSaveSelector:NULL forTarget:nil];
+    Check(Await(^BOOL{ return [operator archive] != nil; }), "stale-selection archive ready");
+    [isolatedDefaults setBool:YES forKey:@"pasteMovesToTop"];
+    for (NSString *action in @[@"double-delete", @"favorite", @"touch", @"delete"]) {
+        NSString *text = [@"stale-" stringByAppendingString:action];
+        Check([operator addClipping:text ofType:@"text/plain" fromApp:nil withAppBundleURL:nil target:nil clippingAddedSelector:NULL], "stale-selection fixture captured");
+        Check(Await(^BOOL{ return [[[operator clippingAtStackPosition] contents] isEqual:text]; }), "stale-selection projection ready");
+        NSString *itemID = [[[operator clippingAtStackPosition] itemID] copy];
+        if ([action isEqual:@"double-delete"]) {
+            Check([operator clearItemAtStackPosition] && [operator clearItemAtStackPosition], "two deletes queued before projection refresh");
+        } else {
+            FlycutArchive *peer = [[FlycutArchive alloc] initWithPath:[root stringByAppendingPathComponent:[action stringByAppendingString:@"-peer.sqlite"]] error:NULL];
+            [peer adoptCollectionID:[operator archive].collectionID sharingExistingEvents:NO error:NULL];
+            [peer ingestEvents:[[operator archive] eventsAfterSequence:0 limit:1000 error:NULL][@"events"] backend:nil checkpoint:nil error:NULL];
+            [peer deleteItemID:itemID error:NULL];
+            [[operator archive] ingestEvents:[peer eventsAfterSequence:0 limit:1000 error:NULL][@"events"] backend:nil checkpoint:nil error:NULL];
+            if ([action isEqual:@"favorite"]) Check([operator saveFromStackToFavorites], "favorite queued against peer-tombstoned projection");
+            else if ([action isEqual:@"touch"]) Check([operator getPasteFromIndex:0] != nil, "touch queued against peer-tombstoned projection");
+            else Check([operator clearItemAtStackPosition], "delete queued against peer-tombstoned projection");
+            [peer release];
+        }
+        Check(Await(^BOOL{ return [[operator archive] itemWithID:itemID error:NULL] == nil && [operator jcListCount] == 0; }), "stale projection refreshes after tombstone");
+        Check(![operator storeDisabled] && [operator archiveError] == nil, "stale item action does not disable healthy capture");
+        NSString *next = [@"after-" stringByAppendingString:action];
+        Check([operator addClipping:next ofType:@"text/plain" fromApp:nil withAppBundleURL:nil target:nil clippingAddedSelector:NULL], "capture accepted after stale mutation");
+        Check(Await(^BOOL{ return [[[operator clippingAtStackPosition] contents] isEqual:next]; }) && ![operator storeDisabled], "new capture durable after stale mutation");
+        [[operator archive] deleteItemID:[[operator clippingAtStackPosition] itemID] error:NULL];
+        Check(Await(^BOOL{ return [operator jcListCount] == 0; }), "owned stale-selection fixture cleared");
+        [itemID release];
+    }
+    [isolatedDefaults setBool:NO forKey:@"pasteMovesToTop"];
+    [operator applicationWillTerminate];
+}
+
 static void RunLiveOperator(NSString *root, NSString *url, NSString *collection, NSString *credentialFile, NSString *marker) {
     NSString *emptyLegacy = [root stringByAppendingPathComponent:@"empty-legacy.plist"];
     [@{} writeToFile:emptyLegacy atomically:YES];
@@ -311,6 +351,7 @@ int main(int argc, const char **argv) {
         Check(![failed addClipping:@"must not enter legacy fallback" ofType:@"text/plain" fromApp:nil withAppBundleURL:nil target:nil clippingAddedSelector:NULL], "failed storage cannot report accepted capture");
         [failed applicationWillTerminate];
         ExerciseContainerMigration(root, raw);
+        ExerciseStaleSelections(root);
         [isolatedDefaults removePersistentDomainForName:suite];
         printf("PASS %lu operator checks; async migration/capture, stable favorites, local suppression, bounded projection and no defaults history writes; no clipboard accessed\n", (unsigned long)checks);
     }

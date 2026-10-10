@@ -322,7 +322,16 @@ static NSDictionary *ReadLegacyDefaults(NSURL *url, NSError **error) {
             NSError *error = nil;
             BOOL success = [operation isEqual:@"favorite"] ? [self->_archive setFavorite:YES forItemID:itemID error:&error] :
                 [operation isEqual:@"touch"] ? [self->_archive touchItemID:itemID error:&error] : [self->_archive deleteItemID:itemID error:&error];
-            if (!success) [self reportArchiveFailure:error ?: self->_archiveError];
+            if (!success) {
+                if ([error.domain isEqualToString:FlycutArchiveErrorDomain] && error.code == FlycutArchiveInvalidArgument) {
+                    [self refreshArchiveProjection];
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        [self delegateAlertWithMessageText:@"Selection changed"
+                                          informationText:@"That item is no longer available. History has been refreshed; clipboard capture is still active."
+                                            buttonsTexts:@[@"OK"]];
+                    });
+                } else [self reportArchiveFailure:error ?: self->_archiveError];
+            }
         }
     });
 }
