@@ -1,0 +1,14 @@
+# systemd user unit: ~/.config/systemd/user/flycut-copyq-bridge.service
+# Replace SERVER with the flycut-sync-server address, e.g. http://100.x.y.z:8742.
+[Unit]
+Description=Flycut clipboard history sync for CopyQ
+After=graphical-session.target flycut-sync-server.service
+
+[Service]
+ExecStart=/usr/bin/python3 %h/.local/share/flycut-copyq-bridge/flycut-copyq-bridge.py --server SERVER --token-file %h/.local/share/flycut-sync-server/token
+UMask=0077
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
