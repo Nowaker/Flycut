@@ -295,7 +295,7 @@
 
 -(FlycutClipping *) clippingAtPosition:(int)index
 {
-    if ( index >= [jcList count] ) {
+    if (index < 0 || (NSUInteger)index >= [jcList count]) {
         return nil;
     } else {
         return [[jcList objectAtIndex:index] clipping];
@@ -304,7 +304,7 @@
 
 -(NSString *) clippingContentsAtPosition:(int)index
 {
-	if ( index >= [jcList count] ) {
+	if (index < 0 || (NSUInteger)index >= [jcList count]) {
 		return nil;
 	} else {
 		return [NSString stringWithString:[[jcList objectAtIndex:index] contents]];
@@ -313,15 +313,12 @@
 
 -(NSString *) clippingDisplayStringAtPosition:(int)index
 {
-    return [[jcList objectAtIndex:index] displayString];
+    return [[self clippingAtPosition:index] displayString];
 }
 
 -(NSString *) clippingTypeAtPosition:(int)index
 {
-    NSString *returnString;
-    returnString = [NSString stringWithString:[[jcList objectAtIndex:index] type]];
-//    return [[jcList objectAtIndex:index] type];
-    return returnString;
+    return [[self clippingAtPosition:index] type];
 }
 
 -(NSArray *) previousContents:(int)howMany

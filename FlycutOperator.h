@@ -15,7 +15,11 @@
 #ifndef FlycutOperator_h
 #define FlycutOperator_h
 
-#import "FlycutStore.h"
+#import "FlycutEngine/FlycutStore.h"
+#ifdef FLYCUT_MAC
+@class FlycutArchive, FlycutSyncController;
+extern NSString * const FlycutOperatorArchiveReadyNotification;
+#endif
 
 @protocol FlycutOperatorDelegate <NSObject>
 @optional
@@ -46,6 +50,13 @@
 	//Preferences
 	BOOL issuedRememberResizeWarning;
 }
+
+#ifdef FLYCUT_MAC
+-(FlycutArchive *)archive;
+-(FlycutSyncController *)syncController;
+-(NSError *)archiveError;
+-(void)seedObservedClipboard:(NSString *)text;
+#endif
 
 // Basic functionality
 -(int)indexOfClipping:(NSString*)contents ofType:(NSString*)type fromApp:(NSString *)appName withAppBundleURL:(NSString *)bundleURL;

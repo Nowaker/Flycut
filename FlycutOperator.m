@@ -14,19 +14,38 @@
 
 #import <Foundation/Foundation.h>
 #import "FlycutOperator.h"
+#ifndef FLYCUT_MAC
 #import "MJCloudKitUserDefaultsSync/MJCloudKitUserDefaultsSync/MJCloudKitUserDefaultsSync.h"
+#endif
 
 #ifdef FLYCUT_MAC
 #import "AppController.h"
+#import "FlycutEngine/FlycutArchive.h"
+#import "Sync/FlycutSync.h"
+#import "Sync/FlycutSyncSettingsController.h"
+NSString * const FlycutOperatorArchiveReadyNotification = @"FlycutOperatorArchiveReadyNotification";
 #endif
 
 @implementation FlycutOperator {
 	NSDateFormatter *dateFormatterForFilename;
 	NSDateFormatter *dateFormatterForDirectory;
+#ifdef FLYCUT_MAC
+    FlycutArchive *_archive;
+    FlycutSyncController *_syncController;
+    NSError *_archiveError;
+    dispatch_queue_t _archiveQueue;
+    NSString *_observedClipboard;
+    BOOL _archiveReady;
+#endif
 }
 
 - (id)init
 {
+    self = [super init];
+    if (!self) return nil;
+#ifdef FLYCUT_MAC
+    _archiveQueue = dispatch_queue_create("net.nowaker.flycut.archive.operator", DISPATCH_QUEUE_SERIAL);
+#endif
 	[[NSUserDefaults standardUserDefaults] registerDefaults:[NSDictionary dictionaryWithObjectsAndKeys:
 		[NSNumber numberWithInt:40],
 		@"rememberNum",
@@ -89,6 +108,127 @@
 	[self registerOrDeregisterICloudSync];
 }
 
+#ifdef FLYCUT_MAC
+-(FlycutArchive *)archive { return _archiveReady ? _archive : nil; }
+-(FlycutSyncController *)syncController { return _syncController; }
+-(NSError *)archiveError { return _archiveError; }
+
+-(void)seedObservedClipboard:(NSString *)text
+{
+    [_observedClipboard release];
+    _observedClipboard = [text copy];
+}
+
+-(void)reportArchiveFailure:(NSError *)error
+{
+    if (!error) error = [NSError errorWithDomain:FlycutArchiveErrorDomain code:FlycutArchiveStorageError userInfo:@{NSLocalizedDescriptionKey:@"Archive is unavailable. Capture is disabled; no legacy writable fallback is used."}];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self->_archiveError release];
+        self->_archiveError = [error retain];
+        self->disableStore = YES;
+        [[NSNotificationCenter defaultCenter] postNotificationName:FlycutOperatorArchiveReadyNotification object:self];
+        [self delegateAlertWithMessageText:@"Archive unavailable"
+                          informationText:[error.localizedDescription stringByAppendingString:@"\nCapture is disabled. Existing archive and legacy defaults are not overwritten."]
+                             buttonsTexts:@[@"OK"]];
+    });
+}
+
+-(void)openArchive
+{
+    NSString *path = [[[NSProcessInfo processInfo] environment] objectForKey:@"FLYCUT_ARCHIVE_PATH"];
+    if (!path.length) {
+        NSString *support = [NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES) firstObject];
+        path = [[support stringByAppendingPathComponent:@"net.nowaker.flycut"] stringByAppendingPathComponent:@"Archive.sqlite"];
+    }
+    NSDictionary *legacy = nil;
+    NSString *legacyPath = [[[NSProcessInfo processInfo] environment] objectForKey:@"FLYCUT_LEGACY_DEFAULTS_PATH"];
+    if (legacyPath.length) {
+        legacy = [NSDictionary dictionaryWithContentsOfFile:legacyPath];
+    } else {
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        NSDictionary *fork = [defaults persistentDomainForName:@"net.nowaker.flycut"];
+        NSDictionary *upstream = [defaults persistentDomainForName:@"com.generalarcade.flycut"];
+        legacy = fork[@"store"] ? fork : upstream;
+    }
+    dispatch_async(_archiveQueue, ^{
+        @autoreleasepool {
+            NSError *error = nil;
+            if (![[NSFileManager defaultManager] createDirectoryAtPath:path.stringByDeletingLastPathComponent withIntermediateDirectories:YES attributes:@{NSFilePosixPermissions:@0700} error:&error]) {
+                [self reportArchiveFailure:error]; return;
+            }
+            self->_archive = [[FlycutArchive alloc] initWithPath:path error:&error];
+            if (!self->_archive || ![self->_archive migrateLegacyDefaults:legacy ?: @{} error:&error]) {
+                [self->_archive release]; self->_archive = nil;
+                [self reportArchiveFailure:error]; return;
+            }
+            [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(archiveChanged:) name:FlycutArchiveDidChangeNotification object:self->_archive];
+            [self refreshArchiveProjection];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                self->_syncController = [[FlycutSyncController alloc] initWithArchive:self->_archive];
+                self->_archiveReady = YES;
+                [[NSNotificationCenter defaultCenter] postNotificationName:FlycutOperatorArchiveReadyNotification object:self];
+                [FlycutSyncSettingsController restoreSyncForController:self->_syncController];
+            });
+        }
+    });
+}
+
+-(void)archiveChanged:(NSNotification *)notification { [self refreshArchiveProjection]; }
+
+-(NSArray *)clippingsForArchiveItems:(NSArray *)items
+{
+    NSMutableArray *clippings = [NSMutableArray arrayWithCapacity:items.count];
+    for (NSDictionary *item in items) {
+        NSString *app = [item[@"source_app"] isKindOfClass:NSString.class] ? item[@"source_app"] : nil;
+        NSString *source = [item[@"source_id"] isKindOfClass:NSString.class] ? item[@"source_id"] : nil;
+        NSInteger timestamp = [item[@"captured_at_ms"] isKindOfClass:NSNumber.class] ? [item[@"captured_at_ms"] longLongValue] / 1000 : 0;
+        FlycutClipping *clipping = [[[FlycutClipping alloc] initWithContents:item[@"text"] withType:item[@"content_type"] withDisplayLength:displayLength withAppLocalizedName:app withAppBundleURL:source withTimestamp:timestamp] autorelease];
+        clipping.itemID = item[@"item_id"];
+        [clippings addObject:clipping];
+    }
+    return clippings;
+}
+
+-(void)refreshArchiveProjection
+{
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (!self->_archive) return;
+        FlycutStore *primary = self->stashedStore ?: self->clippingStore;
+        NSUInteger historyLimit = MIN(1000, MAX(1, [primary rememberNum]));
+        NSUInteger favoriteLimit = MIN(1000, MAX(1, [self->favoritesStore rememberNum]));
+        BOOL groupDuplicates = [[NSUserDefaults standardUserDefaults] boolForKey:@"removeDuplicates"];
+        dispatch_async(self->_archiveQueue, ^{
+            @autoreleasepool {
+                NSError *error = nil;
+                NSDictionary *history = [self->_archive searchText:@"" favoritesOnly:NO groupDuplicates:groupDuplicates limit:historyLimit cursor:nil error:&error];
+                NSDictionary *favorites = history ? [self->_archive searchText:@"" favoritesOnly:YES groupDuplicates:groupDuplicates limit:favoriteLimit cursor:nil error:&error] : nil;
+                if (!favorites) { [self reportArchiveFailure:error]; return; }
+                NSArray *historyClips = [self clippingsForArchiveItems:history[@"items"]];
+                NSArray *favoriteClips = [self clippingsForArchiveItems:favorites[@"items"]];
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [primary replaceProjection:historyClips];
+                    [self->favoritesStore replaceProjection:favoriteClips];
+                    [self adjustStackPositionIfOutOfBounds];
+                });
+            }
+        });
+    });
+}
+
+-(void)mutateArchiveItem:(NSString *)itemID operation:(NSString *)operation
+{
+    if (!itemID) return;
+    dispatch_async(_archiveQueue, ^{
+        @autoreleasepool {
+            NSError *error = nil;
+            BOOL success = [operation isEqual:@"favorite"] ? [self->_archive setFavorite:YES forItemID:itemID error:&error] :
+                [operation isEqual:@"touch"] ? [self->_archive touchItemID:itemID error:&error] : [self->_archive deleteItemID:itemID error:&error];
+            if (!success) [self reportArchiveFailure:error ?: self->_archiveError];
+        }
+    });
+}
+#endif
+
 -(FlycutStore*) allocInitFlycutStoreRemembering:(int) remembering
 {
 	return [[FlycutStore alloc] initRemembering:remembering
@@ -128,6 +268,11 @@
 {
 	[self initializeStores];
 
+#ifdef FLYCUT_MAC
+    [self openArchive];
+    return;
+#endif
+
 	// If our preferences indicate that we are saving, load the dictionary from the saved plist
 	// and use it to get everything set up.
 	if ( [[NSUserDefaults standardUserDefaults] integerForKey:@"savePreference"] >= 1 ) {
@@ -142,6 +287,13 @@
 
 -(int) setRememberNum:(int)newRemember forPrimaryStore:(BOOL) isPrimaryStore
 {
+#ifdef FLYCUT_MAC
+    newRemember = MAX(1, MIN(1000, newRemember));
+    FlycutStore *primary = stashedStore ?: clippingStore;
+    [(isPrimaryStore ? primary : favoritesStore) setRememberNum:newRemember];
+    [self refreshArchiveProjection];
+    return newRemember;
+#endif
 	int oldRemeber = [self rememberNum];
 
 	// Ensure that we don't remember zero or fewer clippings.
@@ -346,6 +498,12 @@
 
 - (bool)saveFromStackToFavorites
 {
+#ifdef FLYCUT_MAC
+    if (clippingStore == favoritesStore || ![self stackPositionIsInBounds]) return NO;
+    NSString *itemID = [[clippingStore clippingAtPosition:stackPosition] itemID];
+    [self mutateArchiveItem:itemID operation:@"favorite"];
+    return itemID != nil;
+#endif
     if ( clippingStore != favoritesStore && [clippingStore jcListCount] > stackPosition ) {
         // Get text from clipping store.
         [favoritesStore addClipping:[clippingStore clippingAtPosition:stackPosition] ];
@@ -357,6 +515,12 @@
 
 - (NSString*)getPasteFromIndex:(int) position {
 	NSString *clipping = [self getClipFromCount:position];
+
+#ifdef FLYCUT_MAC
+    if (clipping && [[NSUserDefaults standardUserDefaults] boolForKey:@"pasteMovesToTop"])
+        [self mutateArchiveItem:[[clippingStore clippingAtPosition:position] itemID] operation:@"touch"];
+    return clipping;
+#endif
 
 	if ( [[NSUserDefaults standardUserDefaults] boolForKey:@"pasteMovesToTop"] ) {
 		[clippingStore clippingMoveToTop:position];
@@ -405,7 +569,12 @@
 
 		}
 		if (skipClipping)
+		{
+#ifdef FLYCUT_MAC
+            [self seedObservedClipboard:contents];
+#endif
 			return YES;
+		}
 
 		// Check the array of lengths to skip for suspicious strings.
 		if ( [[NSUserDefaults standardUserDefaults] boolForKey:@"skipPasswordLengths"] )
@@ -440,7 +609,12 @@
 			}];
 
 			if (skipClipping)
+			{
+#ifdef FLYCUT_MAC
+                [self seedObservedClipboard:contents];
+#endif
 				return YES;
+			}
 		}
 	}
 	return NO;
@@ -481,6 +655,29 @@
 
 -(bool)addClipping:(NSString*)contents ofType:(NSString*)type fromApp:(NSString *)appName withAppBundleURL:(NSString *)bundleURL target:(id)selectorTarget clippingAddedSelector:(SEL)clippingAddedSelector
 {
+#ifdef FLYCUT_MAC
+    if (!contents.length || [_observedClipboard isEqual:contents]) return NO;
+    [self seedObservedClipboard:contents];
+    if (disableStore) return NO;
+    BOOL favorite = [self favoritesStoreIsSelected];
+    NSNumber *captured = @((long long)([[NSDate date] timeIntervalSince1970] * 1000));
+    dispatch_async(_archiveQueue, ^{
+        @autoreleasepool {
+            NSError *error = nil;
+            NSDictionary *item = [self->_archive captureText:contents sourceApp:appName sourceID:bundleURL capturedAtMS:captured favorite:favorite error:&error];
+            if (!item) {
+                [self reportArchiveFailure:error ?: self->_archiveError];
+                return;
+            }
+            [self refreshArchiveProjection];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                self->stackPosition = 0;
+                if (selectorTarget && clippingAddedSelector) [selectorTarget performSelector:clippingAddedSelector];
+            });
+        }
+    });
+    return YES;
+#endif
 	if ( [clippingStore jcListCount] == 0 || ! [contents isEqualToString:[clippingStore clippingContentsAtPosition:0]]) {
 		bool success = [clippingStore addClipping:contents
 										   ofType:type
@@ -500,6 +697,9 @@
 }
 
 - (void)willDeleteClippingFromStore:(id)store AtIndex:(int)index {
+#ifdef FLYCUT_MAC
+    return;
+#endif
 	if ( (!inhibitAutosaveClippings) // Avoid saving things that the user explicitly deletes.
 		&& ( store == favoritesStore
 		? [[[NSUserDefaults standardUserDefaults] valueForKey:@"saveForgottenFavorites"] boolValue]
@@ -571,6 +771,12 @@
 
 -(bool)clearItemAtStackPosition
 {
+#ifdef FLYCUT_MAC
+    if (![self stackPositionIsInBounds]) return NO;
+    NSString *itemID = [[clippingStore clippingAtPosition:stackPosition] itemID];
+    [self mutateArchiveItem:itemID operation:@"delete"];
+    return itemID != nil;
+#endif
     if ([clippingStore jcListCount] == 0)
         return NO;
 
@@ -584,7 +790,7 @@
 
 -(bool)setStackPositionTo:(int) newStackPosition
 {
-	if ( [clippingStore jcListCount] >= newStackPosition ) {
+	if (newStackPosition >= 0 && [clippingStore jcListCount] > newStackPosition) {
 		stackPosition = newStackPosition;
 		return YES;
 	}
@@ -595,24 +801,40 @@
 // delete this check.
 -(void)adjustStackPositionIfOutOfBounds
 {
-	if (stackPosition >= [clippingStore jcListCount] && stackPosition != 0) { // deleted last item
-		stackPosition = [clippingStore jcListCount] - 1;
-	}
+    stackPosition = MAX(0, MIN(stackPosition, [clippingStore jcListCount] - 1));
 }
 
 -(bool)stackPositionIsInBounds
 {
-	return ( [clippingStore jcListCount] > 0 && [clippingStore jcListCount] > stackPosition );
+	return (stackPosition >= 0 && [clippingStore jcListCount] > stackPosition);
 }
 
 -(void)clearList
 {
+#ifdef FLYCUT_MAC
+    dispatch_async(_archiveQueue, ^{
+        @autoreleasepool {
+            NSError *error = nil;
+            if (![self->_archive clearHistory:&error]) [self reportArchiveFailure:error ?: self->_archiveError];
+        }
+    });
+    return;
+#endif
     [clippingStore clearList];
     [self actionAfterListModification];
 }
 
 -(void)mergeList
 {
+#ifdef FLYCUT_MAC
+    NSMutableString *text = [NSMutableString string];
+    for (int index = [clippingStore jcListCount] - 1; index >= 0; --index) {
+        if (text.length) [text appendString:@"\n"];
+        [text appendString:[clippingStore clippingContentsAtPosition:index]];
+    }
+    [self addClipping:text ofType:@"text/plain" fromApp:@"Flycut" withAppBundleURL:nil target:nil clippingAddedSelector:NULL];
+    return;
+#endif
 	[clippingStore mergeList];
 }
 
@@ -621,7 +843,7 @@
 }
 
 -(BOOL) isValidClippingNumber:(NSNumber *)number inStore:(FlycutStore*)store {
-    return ( ([number intValue] + 1) <= [store jcListCount] );
+    return [number intValue] >= 0 && [number intValue] < [store jcListCount];
 }
 
 -(NSString *) clippingStringWithCount:(int)count {
@@ -638,6 +860,7 @@
 
 -(void) registerOrDeregisterICloudSync
 {
+#ifndef FLYCUT_MAC
 	if ( [[NSUserDefaults standardUserDefaults] boolForKey:@"syncSettingsViaICloud"] ) {
 		[[MJCloudKitUserDefaultsSync sharedSync] startWithKeyMatchList:settingsSyncList
 								  withContainerIdentifier:kiCloudId];
@@ -676,8 +899,10 @@
 
 		[[MJCloudKitUserDefaultsSync sharedSync] stopForKeyMatchList:@[@"store"]];
 	}
+#endif
 }
 
+#ifndef FLYCUT_MAC
 -(NSDictionary*) checkPreferencesChanges:(NSDictionary*)changes
 {
 	if ( [changes valueForKey:@"store"] )
@@ -996,6 +1221,9 @@
 {
 	[[MJCloudKitUserDefaultsSync sharedSync] checkCloudKitUpdates];
 }
+#else
+-(void)checkCloudKitUpdates { [_syncController synchronize]; }
+#endif
 
 -(bool) loadEngineFrom:(NSDictionary*)loadDict key:(NSString*)listKey into:(FlycutStore*)store
 {
@@ -1018,6 +1246,10 @@
 
 -(bool) loadEngineFromPList
 {
+#ifdef FLYCUT_MAC
+    [self refreshArchiveProjection];
+    return _archive != nil;
+#endif
 	NSDictionary *loadDict = [[[NSUserDefaults standardUserDefaults] dictionaryForKey:@"store"] copy];
 
 	if ( loadDict != nil ) {
@@ -1098,6 +1330,9 @@
 }
 
 -(void) saveEngine {
+#ifdef FLYCUT_MAC
+    return;
+#endif
 	// saveEngine saves to NSUserDefaults.  If there have been no modifications, just skip this to avoid busy activity for any observers.
 	if ( !([clippingStore modifiedSinceLastSaveStore]
 		   || [favoritesStore modifiedSinceLastSaveStore]) )
@@ -1121,6 +1356,11 @@
 }
 
 - (void)applicationWillTerminate {
+#ifdef FLYCUT_MAC
+    [_syncController stop];
+    dispatch_sync(_archiveQueue, ^{});
+    return;
+#endif
 	if ( [[NSUserDefaults standardUserDefaults] integerForKey:@"savePreference"] >= 1 ) {
 		DLog(@"Saving on exit");
         [self saveEngine];
