@@ -142,6 +142,7 @@
     if (!suppressAlert && AXIsProcessTrustedWithOptions != NULL && !AXIsProcessTrustedWithOptions((CFDictionaryRef) (options))) {
         NSAlert *alert = [NSAlert alertWithMessageText:@"Flycut" defaultButton:@"OK" alternateButton:nil otherButton:nil informativeTextWithFormat:@"For correct functioning of the app please tick Flycut in Accessibility apps list"];
         alert.showsSuppressionButton = YES;
+        [NSApp activateIgnoringOtherApps: YES];
         [alert runModal];
         if (alert.suppressionButton.state == NSOnState) {
             [[NSUserDefaults standardUserDefaults] setValue:[NSNumber numberWithBool:YES]
@@ -162,6 +163,7 @@
         if (!suppressAlert) {
             NSAlert *alert = [NSAlert alertWithMessageText:@"Flycut" defaultButton:@"OK" alternateButton:nil otherButton:nil informativeTextWithFormat:@"Unfortunatly due to some app sandbox security restrictions from Apple Flycut may not correctly function on MacOSX 10.13 or lower. You can download non sandboxed version here: https://github.com/TermiT/Flycut/releases"];
             alert.showsSuppressionButton = YES;
+            [NSApp activateIgnoringOtherApps: YES];
             [alert runModal];
             if (alert.suppressionButton.state == NSOnState) {
                 [[NSUserDefaults standardUserDefaults] setValue:[NSNumber numberWithBool:YES]
@@ -259,6 +261,12 @@
         [[NSUserDefaults standardUserDefaults] setValue:[NSNumber numberWithBool:helperLaunched]
                                                             forKey:@"loadOnStartup"];
 #else
+        if ( @available(macOS 13.0, *) ) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self reconcileLoadOnStartup];
+            });
+            return;
+        }
 
         // This can take five seconds, perhaps more, so do it in the background instead of holding up opening of the preference panel.
         int checkLoginRegistry = [UKLoginItemRegistry indexForLoginItemWithPath:[[NSBundle mainBundle] bundlePath]];
@@ -273,8 +281,7 @@
     });
     [self registerOrDeregisterICloudSync];
 
-    [NSApp activateIgnoringOtherApps: YES];
-    
+    // Flycut has no window at launch, so it activates only to show an alert rather than taking focus from whatever the user is doing.
     // Check if the app has Accessibility permission
     [self showAccessibilityAlert];
     [self showOldOSXAlert];
@@ -849,8 +856,39 @@
 	[self updateSyncLabels];
 }
 
+// macOS 13 dropped the login-item list UKLoginItemRegistry edits; SMAppService registers the app itself.
+// loadOnStartupApplied records what was last applied, so a preference changed while Flycut was quit
+// (defaults write) takes effect at the next launch, while one turned off in System Settings stays off.
+-(void) applyLoadOnStartup API_AVAILABLE(macos(13.0))
+{
+	BOOL wanted = [[NSUserDefaults standardUserDefaults] boolForKey:@"loadOnStartup"];
+	SMAppService *service = [SMAppService mainAppService];
+	NSError *error = nil;
+	if ( wanted && [service status] != SMAppServiceStatusEnabled && ![service registerAndReturnError:&error] )
+		NSLog(@"Flycut: cannot open at login: %@", error);
+	else if ( !wanted && [service status] == SMAppServiceStatusEnabled && ![service unregisterAndReturnError:&error] )
+		NSLog(@"Flycut: cannot stop opening at login: %@", error);
+	[[NSUserDefaults standardUserDefaults] setBool:wanted forKey:@"loadOnStartupApplied"];
+}
+
+-(void) reconcileLoadOnStartup API_AVAILABLE(macos(13.0))
+{
+	NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+	if ( [defaults boolForKey:@"loadOnStartup"] != [defaults boolForKey:@"loadOnStartupApplied"] )
+		[self applyLoadOnStartup];
+	BOOL enabled = [[SMAppService mainAppService] status] == SMAppServiceStatusEnabled;
+	[defaults setBool:enabled forKey:@"loadOnStartup"];
+	[defaults setBool:enabled forKey:@"loadOnStartupApplied"];
+}
+
 -(IBAction)toggleLoadOnStartup:(id)sender {
 	// Since the control in Interface Builder is bound to User Defaults and sends this action, this method is called after User Defaults already reflects the newly-selected state and merely conveys that value to the relevant mechanisms rather than acting to negate the User Defaults state.
+#ifndef SANDBOXING
+	if ( @available(macOS 13.0, *) ) {
+		[self applyLoadOnStartup];
+		return;
+	}
+#endif
 	if ( [[NSUserDefaults standardUserDefaults] boolForKey:@"loadOnStartup"] ) {
         // FIXME: Should ask Gennadii if the "#ifdef SANDBOXING" should be removed and replaced with "if ([AppController isAppSandboxed])"
 #ifdef SANDBOXING
