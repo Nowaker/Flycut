@@ -21,6 +21,18 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now flycut-sync.service
 sudo systemctl status flycut-sync.service
 
+Isolated Linux user-service deployment (no root required): copy SyncService
+into a fresh owned directory such as ~/.local/share/flycut-gpt-sync, then run
+from that directory:
+python3 -m SyncService.install_user --directory "$HOME/.local/share/flycut-gpt-sync" --bind <tailnet-ip> --port 19787
+This provisions a collection and cryptographically random token internally.
+Server grants remain in root .env; client credentials are in client/.env.
+Transfer client/.env without printing its contents. Both files are mode 600.
+The generated flycut-gpt-sync.service is enabled for the user default target;
+the host must have user lingering enabled for startup without login.
+systemctl --user status flycut-gpt-sync.service
+systemctl --user restart flycut-gpt-sync.service
+
 Default listener is 127.0.0.1:8787. For a secured Tailscale network explicitly
 add --bind <100.x.y.z> --secured-tailnet. Never bind a wildcard address.
 Public access requires an HTTPS reverse proxy to the loopback listener;
