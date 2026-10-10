@@ -107,6 +107,8 @@ static NSString * const ConfigurationKey = @"archiveSyncConfiguration";
         _url = [self field:@"Server URL" placeholder:@"https://sync.example.com" y:342 + cloudRow];
         _collection = [self field:@"Collection UUID" placeholder:@"Server's authorized collection UUID" y:304 + cloudRow];
         _credentials = [self field:@"Credential file" placeholder:@"/path/to/.env (FLYCUT_SYNC_TOKEN=...)" y:266 + cloudRow];
+        _folder.cell.lineBreakMode = NSLineBreakByTruncatingMiddle;
+        _credentials.cell.lineBreakMode = NSLineBreakByTruncatingMiddle;
         _chooseCredentials = [self button:@"Choose..." action:@selector(chooseCredentials:) frame:NSMakeRect(478, 230 + cloudRow, 98, 28)];
         _container = [self field:@"iCloud container" placeholder:@"iCloud.net.nowaker.flycut" y:188 + cloudRow];
         _tailnet = [NSButton checkboxWithTitle:@"Allow HTTP to a secured tailnet IP (100.64.0.0/10 only)" target:nil action:nil];
@@ -162,6 +164,8 @@ static NSString * const ConfigurationKey = @"archiveSyncConfiguration";
     _share.enabled = index > 0;
     _chooseFolder.enabled = _folder.enabled && !_controller.busy;
     _chooseCredentials.enabled = _credentials.enabled && !_controller.busy;
+    _folder.toolTip = _folder.stringValue;
+    _credentials.toolTip = _credentials.stringValue;
     for (NSTextField *field in @[_folder, _url, _collection, _credentials, _container]) {
         for (NSView *view in self.window.contentView.subviews) {
             if ([view isKindOfClass:NSTextField.class] && ![(NSTextField *)view isEditable] && [view.identifier isEqual:field.identifier])
@@ -184,6 +188,7 @@ static NSString * const ConfigurationKey = @"archiveSyncConfiguration";
             self->_folderBookmark = [panel.URL bookmarkDataWithOptions:NSURLBookmarkCreationWithSecurityScope includingResourceValuesForKeys:nil relativeToURL:nil error:&error];
             if (!self->_folderBookmark && FlycutSyncIsSandboxed()) [self->_controller failConfiguration:error];
             else self->_folder.stringValue = panel.URL.path;
+            self->_folder.toolTip = self->_folder.stringValue;
         }
     }];
 }
@@ -199,6 +204,7 @@ static NSString * const ConfigurationKey = @"archiveSyncConfiguration";
             self->_credentialBookmark = [panel.URL bookmarkDataWithOptions:NSURLBookmarkCreationWithSecurityScope | NSURLBookmarkCreationSecurityScopeAllowOnlyReadAccess includingResourceValuesForKeys:nil relativeToURL:nil error:&error];
             if (!self->_credentialBookmark && FlycutSyncIsSandboxed()) [self->_controller failConfiguration:error];
             else self->_credentials.stringValue = panel.URL.path;
+            self->_credentials.toolTip = self->_credentials.stringValue;
         }
     }];
 }
