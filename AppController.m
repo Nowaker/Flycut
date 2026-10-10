@@ -18,8 +18,8 @@
 #import "SRRecorderCell.h"
 #import "UKLoginItemRegistry.h"
 #import "UKPrefsPanel.h"
-#import "FlycutArchive.h"
-#import "FlycutSyncSettingsController.h"
+#import "FlycutEngine/FlycutArchive.h"
+#import "Sync/FlycutSyncSettingsController.h"
 #import "NSWindow+TrueCenter.h"
 #import "NSWindow+ULIZoomEffect.h"
 #import <ApplicationServices/ApplicationServices.h>
