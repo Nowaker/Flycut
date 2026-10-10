@@ -17,13 +17,30 @@
 #import "SGHotKeyCenter.h"
 #import "SRRecorderCell.h"
 #import "UKLoginItemRegistry.h"
+#import "UKPrefsPanel.h"
+#import "FlycutArchive.h"
+#import "FlycutSyncSettingsController.h"
 #import "NSWindow+TrueCenter.h"
 #import "NSWindow+ULIZoomEffect.h"
-#import "MJCloudKitUserDefaultsSync/MJCloudKitUserDefaultsSync.h"
 #import <ApplicationServices/ApplicationServices.h>
 #import <CoreFoundation/CoreFoundation.h>
 #import <ServiceManagement/ServiceManagement.h>
 #import <Carbon/Carbon.h>
+
+@interface AppController ()
+- (void)buildHistoryPreferences;
+- (void)toggleHistoryHotKey;
+- (void)configureHistoryProvider;
+- (void)recordHistoryPaste:(NSDictionary *)entry;
+- (void)historyTargetDidActivate:(NSNotification *)notification;
+- (void)finishHistoryPaste;
+- (void)historyTargetActivationFailed;
+- (void)historyPasteFailed:(NSString *)message;
+- (void)historyArchiveDidChange:(NSNotification *)notification;
+- (void)historyArchiveReady:(NSNotification *)notification;
+- (void)dismissHistoryForOtherWindow;
++ (void)importLegacyPreferences:(NSDictionary *)legacy intoDefaults:(NSUserDefaults *)defaults existingPreferences:(NSDictionary *)existing;
+@end
 
 @implementation AppController
 
@@ -38,6 +55,13 @@
 
 - (id)init
 {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *domain = [[NSBundle mainBundle] bundleIdentifier];
+    if ([domain isEqualToString:@"net.nowaker.flycut"] && ![defaults boolForKey:@"legacyPreferencesImported"]) {
+        [AppController importLegacyPreferences:[defaults persistentDomainForName:@"com.generalarcade.flycut"]
+                                   intoDefaults:defaults existingPreferences:[defaults persistentDomainForName:domain]];
+        [defaults setBool:YES forKey:@"legacyPreferencesImported"];
+    }
 	[[NSUserDefaults standardUserDefaults] registerDefaults:[NSDictionary dictionaryWithObjectsAndKeys:
 		[NSDictionary dictionaryWithObjects:[NSArray arrayWithObjects:[NSNumber numberWithInt:9],[NSNumber numberWithLong:1179648],nil] forKeys:[NSArray arrayWithObjects:@"keyCode",@"modifierFlags",nil]],
 		@"ShortcutRecorder mainHotkey",
@@ -51,6 +75,8 @@
 		@"bezelAlpha",
 		[NSNumber numberWithBool:NO],
 		@"stickyBezel",
+        [NSNumber numberWithBool:YES],
+        @"mainHotkeyShowsHistory",
 		[NSNumber numberWithBool:NO],
 		@"wraparoundBezel",
 		[NSNumber numberWithBool:NO],// No by default
@@ -84,62 +110,40 @@
 	[[NSUserDefaults standardUserDefaults] setValue:[NSNumber numberWithBool:NO]
 											 forKey:@"syncClippingsViaICloud"];*/
 
-	settingsSyncList = @[@"displayNum",
-						 @"displayLen",
-						 @"menuIcon",
-						 @"bezelAlpha",
-						 @"stickyBezel",
-						 @"wraparoundBezel",
-						 @"loadOnStartup",
-						 @"menuSelectionPastes",
-						 @"bezelWidth",
-						 @"bezelHeight",
-						 @"popUpAnimation",
-						 @"displayClippingSource",
-						 @"saveForgottenClippings",
-						 @"saveForgottenFavorites",
-                         @"suppressAccessibilityAlert",
-                        ];
-	[settingsSyncList retain];
-
 	menuQueue = dispatch_queue_create(@"com.Flycut.menuUpdateQueue", DISPATCH_QUEUE_SERIAL);
 
 	return [super init];
 }
 
++ (void)importLegacyPreferences:(NSDictionary *)legacy intoDefaults:(NSUserDefaults *)defaults existingPreferences:(NSDictionary *)existing
+{
+    NSArray *numberKeys = @[@"displayNum", @"displayLen", @"menuIcon", @"rememberNum", @"favoritesRememberNum",
+                            @"bezelAlpha", @"bezelWidth", @"bezelHeight", @"stickyBezel", @"wraparoundBezel",
+                            @"menuSelectionPastes", @"displayClippingSource", @"removeDuplicates", @"pasteMovesToTop",
+                            @"skipPasswordFields", @"skipPboardTypes", @"skipPasswordLengths"];
+    for (NSString *key in numberKeys) {
+        id value = legacy[key];
+        if (!existing[key] && [value isKindOfClass:[NSNumber class]]) [defaults setObject:value forKey:key];
+    }
+    for (NSString *key in @[@"skipPboardTypesList", @"skipPasswordLengthsList"]) {
+        id value = legacy[key];
+        if (!existing[key] && [value isKindOfClass:[NSString class]]) [defaults setObject:value forKey:key];
+    }
+    NSDictionary *shortcut = legacy[@"ShortcutRecorder mainHotkey"];
+    if (!existing[@"ShortcutRecorder mainHotkey"] && [shortcut isKindOfClass:[NSDictionary class]] &&
+        [shortcut[@"keyCode"] isKindOfClass:[NSNumber class]] && [shortcut[@"modifierFlags"] isKindOfClass:[NSNumber class]]) {
+        [defaults setObject:@{@"keyCode": shortcut[@"keyCode"], @"modifierFlags": shortcut[@"modifierFlags"]} forKey:@"ShortcutRecorder mainHotkey"];
+    }
+}
+
 - (void)registerOrDeregisterICloudSync
 {
-	if ( [[NSUserDefaults standardUserDefaults] boolForKey:@"syncSettingsViaICloud"] ) {
-		[[MJCloudKitUserDefaultsSync sharedSync] removeNotificationsFor:MJSyncNotificationChanges forTarget:self];
-		[[MJCloudKitUserDefaultsSync sharedSync] addNotificationFor:MJSyncNotificationChanges withSelector:@selector(checkPreferencesChanges:) withTarget: self];
-		// Not registering for conflict notifications, since we just sync settings, and if the settings are conflictingly adjusted simultaneously on two systems there is nothing to say which setting is better.
-
-		[[MJCloudKitUserDefaultsSync sharedSync] startWithKeyMatchList:settingsSyncList
-					withContainerIdentifier:kiCloudId];
-	}
-	else {
-		[[MJCloudKitUserDefaultsSync sharedSync] stopForKeyMatchList:settingsSyncList];
-
-		[[MJCloudKitUserDefaultsSync sharedSync] removeNotificationsFor:MJSyncNotificationChanges forTarget:self];
-	}
-
 	[flycutOperator registerOrDeregisterICloudSync];
 }
 
 - (void)showAccessibilityAlert {
-    BOOL suppressAlert = [[NSUserDefaults standardUserDefaults] boolForKey:@"suppressAccessibilityAlert"];
-    NSDictionary* options = @{(id) (kAXTrustedCheckOptionPrompt): @NO};
-    if (!suppressAlert && AXIsProcessTrustedWithOptions != NULL && !AXIsProcessTrustedWithOptions((CFDictionaryRef) (options))) {
-        NSAlert *alert = [NSAlert alertWithMessageText:@"Flycut" defaultButton:@"OK" alternateButton:nil otherButton:nil informativeTextWithFormat:@"For correct functioning of the app please tick Flycut in Accessibility apps list"];
-        alert.showsSuppressionButton = YES;
-        [alert runModal];
-        if (alert.suppressionButton.state == NSOnState) {
-            [[NSUserDefaults standardUserDefaults] setValue:[NSNumber numberWithBool:YES]
-                                                     forKey:@"suppressAccessibilityAlert"];
-        }
-        NSString *urlString = @"x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility";
-        [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:urlString]];
-    }
+    NSDictionary *options = @{(id)kAXTrustedCheckOptionPrompt: @YES};
+    AXIsProcessTrustedWithOptions((CFDictionaryRef)options);
 }
 
 
@@ -178,6 +182,8 @@
 	// Initialize the FlycutOperator
 	flycutOperator = [[FlycutOperator alloc] init];
 	flycutOperator.delegate = self;
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(historyArchiveReady:)
+                                                 name:FlycutOperatorArchiveReadyNotification object:flycutOperator];
 	[flycutOperator setClippingsStoreDelegate:self];
 	[flycutOperator setFavoritesStoreDelegate:self];
 	[flycutOperator awakeFromNibDisplaying:[[NSUserDefaults standardUserDefaults] integerForKey:@"displayNum"]
@@ -196,8 +202,8 @@
 
 	// Create our pasteboard interface
     jcPasteboard = [NSPasteboard generalPasteboard];
-    [jcPasteboard declareTypes:[NSArray arrayWithObject:NSStringPboardType] owner:nil];
     pbCount = [[NSNumber numberWithInt:[jcPasteboard changeCount]] retain];
+    [flycutOperator seedObservedClipboard:[jcPasteboard stringForType:NSStringPboardType]];
 
 	// Build the statusbar menu
     statusItem = [[[NSStatusBar systemStatusBar]
@@ -206,6 +212,15 @@
     [self switchMenuIconTo: [[NSUserDefaults standardUserDefaults] integerForKey:@"menuIcon"]];
 	[statusItem setMenu:jcMenu];
     [jcMenu setDelegate:self];
+    NSInteger clearMenuIndex = [jcMenu indexOfItemWithTarget:self andAction:@selector(clearClippingList:)];
+    if (clearMenuIndex >= 0) [jcMenu itemAtIndex:clearMenuIndex].title = @"Clear History...";
+    NSMenuItem *historyItem = [[[NSMenuItem alloc] initWithTitle:@"Clipboard History..." action:@selector(showHistoryPanel:) keyEquivalent:@""] autorelease];
+    historyItem.target = self;
+    NSInteger historyMenuIndex = [jcMenu indexOfItemWithTarget:self andAction:@selector(showPreferencePanel:)];
+    [jcMenu insertItem:historyItem atIndex:historyMenuIndex >= 0 ? historyMenuIndex : jcMenu.numberOfItems];
+    NSMenuItem *syncItem = [[[NSMenuItem alloc] initWithTitle:@"Sync Settings..." action:@selector(showSyncSettings:) keyEquivalent:@""] autorelease];
+    syncItem.target = self;
+    [jcMenu insertItem:syncItem atIndex:historyMenuIndex >= 0 ? historyMenuIndex + 1 : jcMenu.numberOfItems];
     jcMenuBaseItemsCount = [[[[jcMenu itemArray] reverseObjectEnumerator] allObjects] count];
     [statusItem setEnabled:YES];
 
@@ -257,10 +272,6 @@
     });
     [self registerOrDeregisterICloudSync];
 
-    [NSApp activateIgnoringOtherApps: YES];
-    
-    // Check if the app has Accessibility permission
-    [self showAccessibilityAlert];
     [self showOldOSXAlert];
 }
 
@@ -330,7 +341,7 @@
     if ( nil != currentRunningApplication )
     {
         // But only if the bezel hasn't opened since the menu closed.  This happens if the bezel hotkey is pressed while the menu is open.  The bezel won't display until the menu closes, but will then display.
-        if (!isBezelDisplayed)
+        if (!isBezelDisplayed && !historyPanel.window.visible)
             [currentRunningApplication activateWithOptions: NSApplicationActivateIgnoringOtherApps];
         // Paste from the bezel in this scenario works fine, so release and forget this resource in both cases.
         [currentRunningApplication release];
@@ -372,6 +383,7 @@
 
 -(IBAction) activateAndOrderFrontStandardAboutPanel:(id)sender
 {
+    [self dismissHistoryForOtherWindow];
     [currentRunningApplication release];
     currentRunningApplication = nil; // So it doesn't get pulled foreground atop the about panel.
     [[NSApplication sharedApplication] activateIgnoringOtherApps:YES];
@@ -457,28 +469,13 @@
 
 -(int) checkRememberNumPref:(int)newRemember forPrimaryStore:(BOOL) isPrimaryStore
 {
-	int oldRemember = [flycutOperator rememberNum];
-	int setRemember = [flycutOperator setRememberNum:newRemember forPrimaryStore:YES];
-
-	if ( isPrimaryStore )
-	{
-		if ( setRemember == oldRemember )
-		{
-			[self updateMenu];
-		}
-		else if ( setRemember < oldRemember )
-		{
-			// Trim down the number displayed in the menu if it is greater than the new
-			// number to remember.
-			if ( isPrimaryStore ) {
-				if ( setRemember < [[NSUserDefaults standardUserDefaults] integerForKey:@"displayNum"] ) {
-					[[NSUserDefaults standardUserDefaults] setValue:[NSNumber numberWithInt:setRemember]
-															 forKey:@"displayNum"];
-					[self updateMenu];
-				}
-			}
-		}
-	}
+    int count = [flycutOperator setRememberNum:newRemember forPrimaryStore:isPrimaryStore];
+    [[NSUserDefaults standardUserDefaults] setInteger:count forKey:isPrimaryStore ? @"rememberNum" : @"favoritesRememberNum"];
+    if (isPrimaryStore && count < [[NSUserDefaults standardUserDefaults] integerForKey:@"displayNum"]) {
+        [[NSUserDefaults standardUserDefaults] setInteger:count forKey:@"displayNum"];
+    }
+    [self updateMenu];
+    return count;
 }
 
 -(IBAction) setFavoritesRememberNumPref:(id)sender
@@ -488,9 +485,7 @@
 
 -(void) checkFavoritesRememberNumPref:(int)newRemember
 {
-	[flycutOperator switchToFavoritesStore];
 	[self checkRememberNumPref:newRemember forPrimaryStore:NO];
-	[flycutOperator restoreStashedStore];
 }
 
 -(IBAction) setDisplayNumPref:(id)sender
@@ -693,6 +688,7 @@
 
 -(IBAction) showPreferencePanel:(id)sender
 {
+    [self dismissHistoryForOtherWindow];
     [currentRunningApplication release];
     currentRunningApplication = nil; // So it doesn't get pulled foreground atop the preference panel.
 	if ([prefsPanel respondsToSelector:@selector(setCollectionBehavior:)])
@@ -820,7 +816,13 @@
 }
 
 /*" +fakeCommandV synthesizes keyboard events for Cmd-v Paste shortcut. "*/
--(void)fakeCommandV { [self fakeKey:@(kVK_ANSI_V) withCommandFlag:TRUE]; }
+-(void)fakeCommandV {
+    if (!AXIsProcessTrusted()) {
+        [self showAccessibilityAlert];
+        return;
+    }
+    [self fakeKey:@(kVK_ANSI_V) withCommandFlag:TRUE];
+}
 
 /*" +fakeDownArrow synthesizes keyboard events for the down-arrow key. "*/
 -(void)fakeDownArrow { [self fakeKey:@125 withCommandFlag:FALSE]; }
@@ -894,7 +896,9 @@
 					});
 				}
 
-				if ( contents == nil || [flycutOperator shouldSkip:contents ofType:[jcPasteboard availableTypeFromArray:[NSArray arrayWithObject:NSStringPboardType]] fromAvailableTypes:[jcPasteboard types]] ) {
+                if (contents.length == 0) {
+                    [flycutOperator seedObservedClipboard:contents];
+                } else if ( [flycutOperator shouldSkip:contents ofType:[jcPasteboard availableTypeFromArray:[NSArray arrayWithObject:NSStringPboardType]] fromAvailableTypes:[jcPasteboard types]] ) {
                    DLog(@"Contents: Empty or skipped");
                } else {
                    // Dispatch back to main queue to safely modify the clipping store and update UI.
@@ -907,7 +911,9 @@
                    });
                }
             });
-        } 
+        } else {
+            [flycutOperator seedObservedClipboard:nil];
+        }
     }
 }
 
@@ -1039,31 +1045,10 @@
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification
 {
-	// Enable notification from CloudKit
-	[NSApp registerForRemoteNotificationTypes:NSRemoteNotificationTypeNone];// silent push notification!
-
 	//Create our hot key
 	[self toggleMainHotKey:[NSNull null]];
-}
-
-// Remote Notifications (APN, aka Push Notifications) are only available on apps distributed via the App Store.
-// To support building for both distribution channels, include the following two methods to detect if Remote Notifications are available and inform MJCloudKitUserDefaultsSync.
-- (void)application:(NSApplication *)application
-didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken {
-	// Forward the token to your provider, using a custom method.
-	NSLog(@"Registered for remote notifications.");
-	[[MJCloudKitUserDefaultsSync sharedSync] setRemoteNotificationsEnabled:YES];
-}
-
-- (void)application:(NSApplication *)application
-didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
-	NSLog(@"Remote notification support is unavailable due to error: %@", error);
-	[[MJCloudKitUserDefaultsSync sharedSync] setRemoteNotificationsEnabled:NO];
-}
-
-- (void)application:(NSApplication *)application didReceiveRemoteNotification:(NSDictionary *)userInfo
-{
-	[flycutOperator checkCloudKitUpdates];
+    [self buildHistoryPreferences];
+    [self toggleHistoryHotKey];
 }
 
 - (void) updateBezel
@@ -1122,6 +1107,11 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 
 - (void)hitMainHotKey:(SGHotKey *)hotKey
 {
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"mainHotkeyShowsHistory"]) {
+        [self showHistoryPanel:nil];
+        return;
+    }
+    if (historyPanel.window.visible) [historyPanel dismiss];
 	if ( ! isBezelDisplayed ) {
 		//Do NOT activate the app so focus stays on app the user is interacting with
 		//https://github.com/TermiT/Flycut/issues/45
@@ -1133,6 +1123,323 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 	} else {
 		[self stackDown];
 	}
+}
+
+- (void)hitHistoryHotKey:(SGHotKey *)hotKey
+{
+    [self showHistoryPanel:nil];
+}
+
+- (void)configureHistoryProvider
+{
+    FlycutArchive *archive = [flycutOperator archive];
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:FlycutArchiveDidChangeNotification object:nil];
+    historyPanel.query = nil;
+    if (!archive) return;
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(historyArchiveDidChange:)
+                                                 name:FlycutArchiveDidChangeNotification object:archive];
+    historyPanel.query = ^(NSString *search, NSDictionary *cursor, NSUInteger limit, HistoryPanelQueryCompletion completion) {
+        BOOL groupDuplicates = [[NSUserDefaults standardUserDefaults] boolForKey:@"removeDuplicates"];
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+            NSError *error = nil;
+            NSDictionary *page = [archive searchText:search favoritesOnly:NO groupDuplicates:groupDuplicates limit:limit cursor:cursor error:&error];
+            if (error.code == FlycutArchiveStaleCursor && [error.domain isEqualToString:FlycutArchiveErrorDomain]) {
+                dispatch_async(dispatch_get_main_queue(), ^{ [historyPanel refresh]; });
+                return;
+            }
+            NSMutableArray *rows = [NSMutableArray array];
+            for (NSDictionary *item in page[@"items"]) {
+                NSMutableDictionary *row = [[item mutableCopy] autorelease];
+                row[@"source"] = item[@"source_app"] == [NSNull null] ? @"" : item[@"source_app"];
+                if (item[@"captured_at_ms"] != [NSNull null]) {
+                    row[@"date"] = [NSDate dateWithTimeIntervalSince1970:[item[@"captured_at_ms"] doubleValue] / 1000.0];
+                }
+                [rows addObject:row];
+            }
+            id next = page[@"next_cursor"];
+            completion(rows, next == [NSNull null] ? nil : next, error);
+        });
+    };
+}
+
+- (void)historyArchiveReady:(NSNotification *)notification
+{
+    if (historyPanel) {
+        [self configureHistoryProvider];
+        if ([flycutOperator archiveError]) [historyPanel showError:[NSString stringWithFormat:@"History unavailable: %@", [flycutOperator archiveError].localizedDescription]];
+        else [historyPanel refresh];
+    }
+}
+
+- (IBAction)showSyncSettings:(id)sender
+{
+    if (![flycutOperator syncController]) return;
+    if (!syncSettingsController) {
+        syncSettingsController = [[FlycutSyncSettingsController alloc] initWithSyncController:[flycutOperator syncController]];
+    }
+    [currentRunningApplication release];
+    currentRunningApplication = nil;
+    [self dismissHistoryForOtherWindow];
+    [NSApp activateIgnoringOtherApps:YES];
+    [syncSettingsController showWindow:self];
+}
+
+- (BOOL)validateMenuItem:(NSMenuItem *)item
+{
+    if (item.action == @selector(showSyncSettings:)) {
+        BOOL ready = [flycutOperator syncController] != nil;
+        item.title = ready ? @"Sync Settings..." : ([flycutOperator archiveError] ? @"Sync Settings (History Unavailable)" : @"Sync Settings (Opening History...)");
+        return ready;
+    }
+    return YES;
+}
+
+- (void)historyArchiveDidChange:(NSNotification *)notification
+{
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [historyPanel refresh];
+    });
+}
+
+- (void)recordHistoryPaste:(NSDictionary *)entry
+{
+    if (![[NSUserDefaults standardUserDefaults] boolForKey:@"pasteMovesToTop"]) return;
+    FlycutArchive *archive = [flycutOperator archive];
+    NSString *itemID = entry[@"item_id"];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        NSError *error = nil;
+        if (![archive touchItemID:itemID error:&error] && error) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NSString *message = [NSString stringWithFormat:@"Paste was sent, but its history order could not be saved: %@", error.localizedDescription];
+                if (historyPanel.window.visible) [historyPanel showError:message];
+                else {
+                    [historyDeferredError release];
+                    historyDeferredError = [message copy];
+                }
+            });
+        }
+    });
+}
+
+- (void)dismissHistoryForOtherWindow
+{
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(finishHistoryPaste) object:nil];
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(historyTargetActivationFailed) object:nil];
+    [[[NSWorkspace sharedWorkspace] notificationCenter] removeObserver:self name:NSWorkspaceDidActivateApplicationNotification object:nil];
+    historyPasteInProgress = NO;
+    [pendingHistoryPaste release];
+    pendingHistoryPaste = nil;
+    [historyTargetApplication release];
+    historyTargetApplication = nil;
+    [historyPanel dismiss];
+}
+
+- (IBAction)showHistoryPanel:(id)sender
+{
+    if (historyPasteInProgress) return;
+    if (!historyPanel) {
+        historyPanel = [[HistoryPanelController alloc] init];
+        historyPanel.historyDelegate = self;
+        [self configureHistoryProvider];
+    }
+    NSRunningApplication *target = [[NSWorkspace sharedWorkspace] frontmostApplication];
+    if (!historyPanel.window.visible || target.processIdentifier != [[NSProcessInfo processInfo] processIdentifier]) {
+        if (target.processIdentifier == [[NSProcessInfo processInfo] processIdentifier]) target = currentRunningApplication;
+        [historyTargetApplication release];
+        historyTargetApplication = [target retain];
+    }
+    [self hideBezel];
+    [NSApp activateIgnoringOtherApps:YES];
+    [historyPanel open];
+    if (historyDeferredError && [flycutOperator archive]) {
+        [historyPanel showError:historyDeferredError];
+        [historyDeferredError release];
+        historyDeferredError = nil;
+    }
+    if (![flycutOperator archive]) {
+        NSError *error = [flycutOperator archiveError];
+        if (error) [historyPanel showError:[NSString stringWithFormat:@"History unavailable: %@", error.localizedDescription]];
+        else [historyPanel showLoading:@"Opening saved history..."];
+    }
+}
+
+- (void)historyPanelDidDismiss:(HistoryPanelController *)controller
+{
+    if (historyPasteInProgress) return;
+    if (historyTargetApplication && !historyTargetApplication.terminated) {
+        [historyTargetApplication activateWithOptions:NSApplicationActivateIgnoringOtherApps];
+    }
+    [historyTargetApplication release];
+    historyTargetApplication = nil;
+}
+
+- (void)historyPanel:(HistoryPanelController *)controller pasteEntry:(NSDictionary *)entry
+{
+    if (!historyTargetApplication || historyTargetApplication.terminated) {
+        [historyPanel showError:@"The original app is unavailable. Close history and reopen it from the app you want to paste into."];
+        return;
+    }
+    if (!AXIsProcessTrusted()) {
+        [self showAccessibilityAlert];
+        [historyPanel showError:@"Allow Flycut in System Settings > Privacy & Security > Accessibility, then try Paste again."];
+        return;
+    }
+    historyPasteInProgress = YES;
+    [pendingHistoryPaste release];
+    pendingHistoryPaste = [entry copy];
+    [[[NSWorkspace sharedWorkspace] notificationCenter] addObserver:self selector:@selector(historyTargetDidActivate:)
+                                                             name:NSWorkspaceDidActivateApplicationNotification object:nil];
+    [historyPanel dismiss];
+    if (!historyTargetApplication.active && ![historyTargetApplication activateWithOptions:NSApplicationActivateIgnoringOtherApps]) {
+        [self historyTargetActivationFailed];
+        return;
+    }
+    [self performSelector:@selector(finishHistoryPaste) withObject:nil afterDelay:0.05];
+    [self performSelector:@selector(historyTargetActivationFailed) withObject:nil afterDelay:2.0];
+}
+
+- (void)historyTargetDidActivate:(NSNotification *)notification
+{
+    NSRunningApplication *application = notification.userInfo[NSWorkspaceApplicationKey];
+    if (application.processIdentifier == historyTargetApplication.processIdentifier) [self finishHistoryPaste];
+}
+
+- (void)finishHistoryPaste
+{
+    if (!historyPasteInProgress || !historyTargetApplication.active) return;
+    CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStatePrivate);
+    CGEventRef down = source ? CGEventCreateKeyboardEvent(source, kVK_ANSI_V, true) : NULL;
+    CGEventRef up = source ? CGEventCreateKeyboardEvent(source, kVK_ANSI_V, false) : NULL;
+    if (!down || !up) {
+        if (down) CFRelease(down);
+        if (up) CFRelease(up);
+        if (source) CFRelease(source);
+        [self historyPasteFailed:@"Could not prepare Paste. Nothing was pasted. Try again."];
+        return;
+    }
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(historyTargetActivationFailed) object:nil];
+    [[[NSWorkspace sharedWorkspace] notificationCenter] removeObserver:self name:NSWorkspaceDidActivateApplicationNotification object:nil];
+    [self addClipToPasteboard:pendingHistoryPaste[@"text"]];
+    CGEventSetFlags(down, kCGEventFlagMaskCommand | 0x000008);
+    CGEventSetFlags(up, kCGEventFlagMaskCommand | 0x000008);
+    CGEventPostToPid(historyTargetApplication.processIdentifier, down);
+    CGEventPostToPid(historyTargetApplication.processIdentifier, up);
+    CFRelease(down);
+    CFRelease(up);
+    CFRelease(source);
+    [self recordHistoryPaste:pendingHistoryPaste];
+    [pendingHistoryPaste release];
+    pendingHistoryPaste = nil;
+    [historyTargetApplication release];
+    historyTargetApplication = nil;
+    historyPasteInProgress = NO;
+}
+
+- (void)historyTargetActivationFailed
+{
+    [self historyPasteFailed:@"Could not return to the original app. Nothing was pasted. Try again or close history."];
+}
+
+- (void)historyPasteFailed:(NSString *)message
+{
+    if (!historyPasteInProgress) return;
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(historyTargetActivationFailed) object:nil];
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(finishHistoryPaste) object:nil];
+    [[[NSWorkspace sharedWorkspace] notificationCenter] removeObserver:self name:NSWorkspaceDidActivateApplicationNotification object:nil];
+    [pendingHistoryPaste release];
+    pendingHistoryPaste = nil;
+    historyPasteInProgress = NO;
+    [NSApp activateIgnoringOtherApps:YES];
+    [historyPanel open];
+    [historyPanel showError:message];
+}
+
+- (void)toggleHistoryHotKey
+{
+    historyShortcutStatus.stringValue = @"";
+    if (historyHotKey) {
+        [[SGHotKeyCenter sharedCenter] unregisterHotKey:historyHotKey];
+        [historyHotKey release];
+        historyHotKey = nil;
+    }
+    KeyCombo combo = historyRecorder.keyCombo;
+    if (combo.code < 0 || combo.flags == 0) return;
+    historyHotKey = [[SGHotKey alloc] initWithIdentifier:@"historyHotKey"
+                                              keyCombo:[SGKeyCombo keyComboWithKeyCode:combo.code modifiers:[historyRecorder cocoaToCarbonFlags:combo.flags]]];
+    historyHotKey.target = self;
+    historyHotKey.action = @selector(hitHistoryHotKey:);
+    if (![[SGHotKeyCenter sharedCenter] registerHotKey:historyHotKey]) {
+        historyShortcutStatus.stringValue = @"Shortcut unavailable. Choose a different key combination.";
+    }
+}
+
+- (void)buildHistoryPreferences
+{
+    NSMutableArray *legacyControls = [NSMutableArray arrayWithObject:prefsPanel.contentView];
+    while (legacyControls.count) {
+        NSView *view = [[[legacyControls lastObject] retain] autorelease];
+        [legacyControls removeLastObject];
+        [legacyControls addObjectsFromArray:view.subviews];
+        if ([view isKindOfClass:[NSButton class]]) {
+            NSButton *button = (NSButton *)view;
+            if (button.action == @selector(toggleICloudSyncSettings:) || button.action == @selector(toggleICloudSyncClippings:)) {
+                button.enabled = NO;
+                button.hidden = YES;
+            }
+        }
+        if ([view isKindOfClass:[NSTextField class]] && [[(NSTextField *)view stringValue] isEqualToString:@"iCloud Sync:"]) view.hidden = YES;
+        if ([view isKindOfClass:[NSTextField class]] && [[[(NSTextField *)view stringValue] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] isEqualToString:@"Remember"]) {
+            [(NSTextField *)view setStringValue:@"Recent"];
+            view.toolTip = @"Number of recent clips available in the menu and bezel. Clipboard History keeps all saved text.";
+        }
+        if ([view isKindOfClass:[NSControl class]]) {
+            NSString *binding = [view infoForBinding:NSValueBinding][NSObservedKeyPathKey];
+            if ([binding isEqualToString:@"values.rememberNum"] || [binding isEqualToString:@"values.favoritesRememberNum"]) {
+                view.toolTip = @"Recent menu/bezel count only. Changing this does not delete saved history or favorites.";
+            }
+        }
+    }
+    UKPrefsPanel *switcher = (UKPrefsPanel *)prefsPanel.toolbar.delegate;
+    NSTabView *tabs = switcher.tabView;
+    NSView *view = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 507, 320)] autorelease];
+    NSBox *box = [[[NSBox alloc] initWithFrame:view.bounds] autorelease];
+    box.titlePosition = NSNoTitle;
+    box.borderType = NSNoBorder;
+    box.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    [view addSubview:box];
+    NSView *content = box.contentView;
+    NSButton *mode = [NSButton checkboxWithTitle:@"Main shortcut opens searchable history" target:nil action:nil];
+    mode.frame = NSMakeRect(20, 260, 467, 24);
+    [self setBinding:@"value" forKey:@"mainHotkeyShowsHistory" andOrAction:nil on:mode];
+    [content addSubview:mode];
+    NSTextField *explanation = [NSTextField wrappingLabelWithString:@"Turn this off to use the original bezel on the main shortcut. The history panel stays open until you paste or close it."];
+    explanation.frame = NSMakeRect(20, 200, 457, 48);
+    explanation.textColor = [NSColor secondaryLabelColor];
+    [content addSubview:explanation];
+    NSTextField *label = [NSTextField labelWithString:@"Separate history shortcut (optional)"];
+    label.frame = NSMakeRect(20, 166, 457, 22);
+    [content addSubview:label];
+    historyRecorder = [[SRRecorderControl alloc] initWithFrame:NSMakeRect(20, 124, 200, 30)];
+    NSDictionary *shortcut = [[NSUserDefaults standardUserDefaults] dictionaryForKey:@"ShortcutRecorder historyHotkey"];
+    if (shortcut) [historyRecorder setKeyCombo:SRMakeKeyCombo([shortcut[@"keyCode"] intValue], [shortcut[@"modifierFlags"] unsignedIntegerValue])];
+    else [historyRecorder setKeyCombo:SRMakeKeyCombo(-1, 0)];
+    historyRecorder.delegate = self;
+    [historyRecorder setAccessibilityLabel:@"Separate history shortcut"];
+    [content addSubview:historyRecorder];
+    NSTextField *hint = [NSTextField wrappingLabelWithString:@"Choose a shortcut with a modifier key, or clear it to disable. Use this shortcut alongside the original bezel."];
+    hint.frame = NSMakeRect(20, 64, 457, 44);
+    hint.textColor = [NSColor secondaryLabelColor];
+    [content addSubview:hint];
+    historyShortcutStatus = [[NSTextField wrappingLabelWithString:@""] retain];
+    historyShortcutStatus.frame = NSMakeRect(20, 16, 457, 40);
+    [content addSubview:historyShortcutStatus];
+    NSString *identifier = NSImageNameListViewTemplate;
+    NSTabViewItem *item = [[[NSTabViewItem alloc] initWithIdentifier:identifier] autorelease];
+    item.label = @"History";
+    item.view = view;
+    [tabs insertTabViewItem:item atIndex:MAX(0, tabs.numberOfTabViewItems - 1)];
+    prefsPanel.toolbar = nil;
+    [switcher mapTabsToToolbar];
 }
 
 - (IBAction)toggleMainHotKey:(id)sender
@@ -1255,15 +1562,17 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 }
 
 -(IBAction)clearClippingList:(id)sender {
-    int choice;
-	
 	[NSApp activateIgnoringOtherApps:YES];
-    choice = NSRunAlertPanel(@"Clear Clipping List", 
-							 @"Do you want to clear all recent clippings?",
-							 @"Clear", @"Cancel", nil);
-	
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    alert.messageText = @"Clear History?";
+    alert.informativeText = @"This deletes currently known nonfavorite clips from local and synced history; favorites are kept. Offline devices may send other clips later, and logs or backups may retain deleted text.";
+    NSButton *deleteButton = [alert addButtonWithTitle:@"Delete History"];
+    deleteButton.keyEquivalent = @"";
+    NSButton *cancelButton = [alert addButtonWithTitle:@"Cancel"];
+    cancelButton.keyEquivalent = @"\033";
+    NSInteger choice = [alert runModal];
     // on clear, zap the list and redraw the menu
-    if ( choice == NSAlertDefaultReturn ) {
+    if ( choice == NSAlertFirstButtonReturn ) {
         [self restoreStashedStoreAndUpdate]; // Only clear the clipping store.  Never the favorites.
         [flycutOperator clearList];
         [self updateMenu];
@@ -1352,6 +1661,7 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
     [jcPasteboard declareTypes:pbTypes owner:NULL];
 	
     [jcPasteboard setString:pbFullText forType:@"NSStringPboardType"];
+    [flycutOperator seedObservedClipboard:pbFullText];
     [self setPBBlockCount:[NSNumber numberWithInt:[jcPasteboard changeCount]]];
 }
 
@@ -1394,9 +1704,22 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 			[NSDictionary dictionaryWithObjects:[NSArray arrayWithObjects:[NSNumber numberWithInt:[mainRecorder keyCombo].code],[NSNumber numberWithInt:[mainRecorder keyCombo].flags],nil] forKeys:[NSArray arrayWithObjects:@"keyCode",@"modifierFlags",nil]]
 		forKey:@"ShortcutRecorder mainHotkey"];
 	}
+    else if (aRecorder == historyRecorder) {
+        [[NSUserDefaults standardUserDefaults] setObject:@{@"keyCode": @(historyRecorder.keyCombo.code), @"modifierFlags": @(historyRecorder.keyCombo.flags)}
+                                                forKey:@"ShortcutRecorder historyHotkey"];
+    }
 }
 
 - (BOOL)shortcutRecorder:(SRRecorderControl *)aRecorder isKeyCode:(NSInteger)keyCode andFlagsTaken:(NSUInteger)flags reason:(NSString **)aReason {
+    SRRecorderControl *other = aRecorder == historyRecorder ? mainRecorder : historyRecorder;
+    if (other && other.keyCombo.code == keyCode && other.keyCombo.flags == flags) {
+        if (aReason) *aReason = @"The other Flycut shortcut already uses this key combination.";
+        return YES;
+    }
+    if (aRecorder == historyRecorder && flags == 0) {
+        if (aReason) *aReason = @"The history shortcut needs a modifier key.";
+        return YES;
+    }
 	return NO;
 }
 
@@ -1405,6 +1728,10 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 		[self toggleMainHotKey: aRecorder];
 		[self setHotKeyPreferenceForRecorder: aRecorder];
 	}
+    else if (aRecorder == historyRecorder) {
+        [self toggleHistoryHotKey];
+        [self setHotKeyPreferenceForRecorder:aRecorder];
+    }
 	DLog(@"code: %ld, flags: %lu", (long)newKeyCombo.code, (unsigned long)newKeyCombo.flags);
 }
 
@@ -1473,6 +1800,13 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 	[[SGHotKeyCenter sharedCenter] unregisterHotKey: mainHotKey];
 	[mainHotKey release];
 	mainHotKey = nil;
+    [[SGHotKeyCenter sharedCenter] unregisterHotKey:historyHotKey];
+    [historyHotKey release];
+    historyHotKey = nil;
+    historyPanel.historyDelegate = nil;
+    [historyPanel dismiss];
+    historyPanel.query = nil;
+    [[[NSWorkspace sharedWorkspace] notificationCenter] removeObserver:self];
 	[self hideBezel];
 	[[NSDistributedNotificationCenter defaultCenter]
 		removeObserver:self
@@ -1485,6 +1819,15 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 }
 
 - (void) dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [NSObject cancelPreviousPerformRequestsWithTarget:self];
+    [historyPanel release];
+    [syncSettingsController release];
+    [historyRecorder release];
+    [historyShortcutStatus release];
+    [historyTargetApplication release];
+    [pendingHistoryPaste release];
+    [historyDeferredError release];
 	[bezel release];
 	[srTransformer release];
 	[super dealloc];

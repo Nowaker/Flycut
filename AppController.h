@@ -19,12 +19,23 @@
 #import "SRKeyCodeTransformer.h"
 #import "FlycutOperator.h"
 #import "SGHotKey.h"
+#import "HistoryPanelController.h"
 
 @class SGHotKey;
+@class FlycutSyncSettingsController;
 
-@interface AppController : NSObject <NSMenuDelegate, NSApplicationDelegate, FlycutStoreDelegate, FlycutOperatorDelegate, BezelWindowDelegate> {
+@interface AppController : NSObject <NSMenuDelegate, NSApplicationDelegate, FlycutStoreDelegate, FlycutOperatorDelegate, BezelWindowDelegate, HistoryPanelDelegate> {
     BezelWindow					*bezel;
 	SGHotKey					*mainHotKey;
+    SGHotKey                    *historyHotKey;
+    SRRecorderControl           *historyRecorder;
+    NSTextField                 *historyShortcutStatus;
+    HistoryPanelController      *historyPanel;
+    NSRunningApplication        *historyTargetApplication;
+    NSDictionary                *pendingHistoryPaste;
+    NSString                    *historyDeferredError;
+    BOOL                         historyPasteInProgress;
+    FlycutSyncSettingsController *syncSettingsController;
 	IBOutlet SRRecorderControl	*mainRecorder;
 	IBOutlet NSPanel			*prefsPanel;
 	IBOutlet NSTextView			*acknowledgementsView;
@@ -35,8 +46,6 @@
 	BOOL						isBezelPinned; // Currently not used
 	NSString					*currentKeycodeCharacter;
     NSDateFormatter*            dateFormat;
-
-    NSArray *settingsSyncList;
 
     FlycutOperator				*flycutOperator;
 
@@ -94,6 +103,9 @@
 
 // Hotkey related
 -(void)hitMainHotKey:(SGHotKey *)hotKey;
+-(void)hitHistoryHotKey:(SGHotKey *)hotKey;
+-(IBAction)showHistoryPanel:(id)sender;
+-(IBAction)showSyncSettings:(id)sender;
 
 // Bezel related
 -(void) updateBezel;
