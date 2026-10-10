@@ -78,6 +78,8 @@
         @"suppressAccessibilityAlert",
         [NSNumber numberWithInt:0],
         @"mainHotkeyPopup",
+        [NSNumber numberWithBool:NO],
+        @"syncFolderEnabled",
         nil]];
 
 	/* For testing, the ability to force initial values of the sync settings:
@@ -750,6 +752,47 @@
 		}
 	}
 	[flycutOperator willShowPreferences];
+	[self updateFolderSyncLabels];
+}
+
+-(void) updateFolderSyncLabels
+{
+	NSString *folder = [[NSUserDefaults standardUserDefaults] stringForKey:@"syncFolderPath"];
+	[syncFolderLabel setStringValue:[folder length] ? [folder stringByAbbreviatingWithTildeInPath] : @"No folder chosen"];
+	[syncStatusLabel setStringValue:[flycutOperator folderSyncStatus]];
+}
+
+-(IBAction) toggleFolderSync:(id)sender
+{
+	BOOL enabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"syncFolderEnabled"];
+	if ( enabled && [[[NSUserDefaults standardUserDefaults] stringForKey:@"syncFolderPath"] length] == 0 ) {
+		[self chooseSyncFolder:sender];
+		return;
+	}
+	[flycutOperator folderSyncPreferenceDidChange];
+	[self updateFolderSyncLabels];
+}
+
+-(IBAction) chooseSyncFolder:(id)sender
+{
+	NSOpenPanel *panel = [NSOpenPanel openPanel];
+	[panel setCanChooseFiles:NO];
+	[panel setCanChooseDirectories:YES];
+	[panel setCanCreateDirectories:YES];
+	[panel setAllowsMultipleSelection:NO];
+	[panel setPrompt:@"Sync Here"];
+	[panel setMessage:@"Choose a folder that iCloud Drive, Dropbox or Syncthing keeps in sync between your machines. Each machine writes its own file there."];
+	[panel beginSheetModalForWindow:prefsPanel completionHandler:^(NSInteger result) {
+		NSURL *url = [[panel URLs] firstObject];
+		if ( result == NSModalResponseOK && url ) {
+			[[NSUserDefaults standardUserDefaults] setObject:[url path] forKey:@"syncFolderPath"];
+			[[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"syncFolderEnabled"];
+		} else if ( [[[NSUserDefaults standardUserDefaults] stringForKey:@"syncFolderPath"] length] == 0 ) {
+			[[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"syncFolderEnabled"];
+		}
+		[flycutOperator folderSyncPreferenceDidChange];
+		[self updateFolderSyncLabels];
+	}];
 }
 
 -(IBAction)toggleLoadOnStartup:(id)sender {
@@ -1326,6 +1369,7 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 		}
 	}
 	[flycutOperator savePreferenceDidChange];
+	[self updateFolderSyncLabels];
 }
 
 - (IBAction)selectSaveLocation:(id)sender {

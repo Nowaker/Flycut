@@ -33,6 +33,8 @@
 	IBOutlet NSPanel			*prefsPanel;
 	IBOutlet NSTextView			*acknowledgementsView;
 	IBOutlet NSBox			  *appearancePanel;
+	IBOutlet NSTextField		*syncFolderLabel;
+	IBOutlet NSTextField		*syncStatusLabel;
 	int							mainHotkeyModifiers;
 	SRKeyCodeTransformer        *srTransformer;
 	BOOL						isBezelDisplayed;
@@ -130,6 +132,8 @@
 -(IBAction) toggleICloudSyncSettings:(id)sender;
 -(IBAction) toggleICloudSyncClippings:(id)sender;
 -(IBAction) setSavePreference:(id)sender;
+-(IBAction) toggleFolderSync:(id)sender;
+-(IBAction) chooseSyncFolder:(id)sender;
 -(void) setHotKeyPreferenceForRecorder:(SRRecorderControl *)aRecorder;
 
 @end

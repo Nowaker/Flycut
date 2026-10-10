@@ -138,14 +138,16 @@
 		[self delegateInsertClippingAtIndex:index];
 
 	// Delete clippings older than jcRememberNum
+	NSMutableArray *droppedClippings = [NSMutableArray array];
 	while ( [jcList count] > jcRememberNum ) {
 		[self delegateWillDeleteClippingAtIndex:jcRememberNum];
-		[removedClippings addObject:[jcList objectAtIndex:jcRememberNum]];
+		[droppedClippings addObject:[jcList objectAtIndex:jcRememberNum]];
 		[jcList removeObjectAtIndex:jcRememberNum];
 		[self delegateDeleteClippingAtIndex:(jcRememberNum-1)]; // -1 for before-add indexing
 	}
 
 	[self persistRemovedClippings:removedClippings];
+	[self persistDroppedClippings:droppedClippings];
 	[self.persistence store:self didSaveClipping:clipping];
 
 	[self delegateEndUpdates];
@@ -160,18 +162,130 @@
 	double newerRank = hasNewer ? [[jcList objectAtIndex:index - 1] rank] : 0;
 	double olderRank = hasOlder ? [[jcList objectAtIndex:index + 1] rank] : 0;
 
+	// A new top clipping ranks by the current time, so tops from different machines interleave by when they were made.
 	if ( hasNewer && hasOlder )
 		[clipping setRank:(newerRank + olderRank) / 2];
 	else if ( hasNewer )
 		[clipping setRank:newerRank - 1];
 	else
-		[clipping setRank:olderRank + 1];
+		[clipping setRank:MAX(olderRank + 1, [[NSDate date] timeIntervalSince1970])];
 }
 
 -(void) persistRemovedClippings:(NSArray *)clippings
 {
 	if ( [clippings count] > 0 )
 		[self.persistence store:self didRemoveClippings:clippings];
+}
+
+-(void) persistDroppedClippings:(NSArray *)clippings
+{
+	if ( [clippings count] == 0 )
+		return;
+	if ( [self.persistence respondsToSelector:@selector(store:didDropClippings:)] )
+		[self.persistence store:self didDropClippings:clippings];
+	else
+		[self.persistence store:self didRemoveClippings:clippings];
+}
+
+-(int) indexOfClippingWithId:(NSString *)clipId
+{
+	NSUInteger index = [jcList indexOfObjectPassingTest:^BOOL(FlycutClipping *clipping, NSUInteger idx, BOOL *stop) {
+		return [[clipping clipId] isEqualToString:clipId];
+	}];
+	return index == NSNotFound ? -1 : (int)index;
+}
+
+static BOOL ClippingOutranks(FlycutClipping *a, FlycutClipping *b)
+{
+	if ( [a rank] != [b rank] )
+		return [a rank] > [b rank];
+	return [[a clipId] compare:[b clipId]] == NSOrderedDescending;
+}
+
+-(void) placeClippings:(NSArray *)clippings
+{
+	if ( [clippings count] == 0 )
+		return;
+	[self delegateBeginUpdates];
+
+	NSMutableDictionary *incoming = [NSMutableDictionary dictionaryWithCapacity:[clippings count]];
+	for ( FlycutClipping *clipping in clippings ) {
+		[clipping setDisplayLength:jcDisplayLen];
+		[incoming setObject:clipping forKey:[clipping clipId]];
+	}
+
+	// Clippings being replaced are dropped from the database only if their replacement doesn't make it in.
+	NSMutableDictionary *replaced = [NSMutableDictionary dictionary];
+	NSMutableArray *candidates = [NSMutableArray arrayWithCapacity:[jcList count] + [incoming count]];
+	for ( FlycutClipping *clipping in jcList ) {
+		if ( [incoming objectForKey:[clipping clipId]] )
+			[replaced setObject:clipping forKey:[clipping clipId]];
+		else
+			[candidates addObject:clipping];
+	}
+	[candidates addObjectsFromArray:[incoming allValues]];
+	[candidates sortUsingComparator:^NSComparisonResult(FlycutClipping *a, FlycutClipping *b) {
+		if ( ClippingOutranks(a, b) )
+			return NSOrderedAscending;
+		return ClippingOutranks(b, a) ? NSOrderedDescending : NSOrderedSame;
+	}];
+
+	NSMutableArray *droppedClippings = [NSMutableArray array];
+	NSMutableArray *placed = [NSMutableArray arrayWithCapacity:[candidates count]];
+	NSMutableSet *seenContents = [self removeDuplicates] ? [NSMutableSet set] : nil;
+	for ( FlycutClipping *clipping in candidates ) {
+		if ( seenContents ) {
+			if ( [seenContents containsObject:[clipping contents]] ) {
+				if ( ![incoming objectForKey:[clipping clipId]] )
+					[droppedClippings addObject:clipping];
+				continue;
+			}
+			[seenContents addObject:[clipping contents]];
+		}
+		[placed addObject:clipping];
+	}
+
+	for ( int i = (int)[jcList count] ; i > 0 ; i-- )
+		[self delegateDeleteClippingAtIndex:(i-1)];
+	[jcList setArray:placed];
+	while ( [jcList count] > jcRememberNum ) {
+		[self delegateWillDeleteClippingAtIndex:jcRememberNum];
+		[droppedClippings addObject:[jcList objectAtIndex:jcRememberNum]];
+		[jcList removeObjectAtIndex:jcRememberNum];
+	}
+	for ( int i = 0 ; i < [jcList count] ; i++ )
+		[self delegateInsertClippingAtIndex:i];
+
+	NSMutableSet *keptIds = [NSMutableSet setWithArray:[jcList valueForKey:@"clipId"]];
+	for ( NSString *clipId in replaced )
+		if ( ![keptIds containsObject:clipId] )
+			[droppedClippings addObject:[replaced objectForKey:clipId]];
+	[self persistDroppedClippings:droppedClippings];
+	for ( FlycutClipping *clipping in [incoming allValues] )
+		if ( [keptIds containsObject:[clipping clipId]] )
+			[self.persistence store:self didSaveClipping:clipping];
+
+	modifiedSinceLastSaveStore = YES;
+	[self delegateEndUpdates];
+}
+
+-(void) removeClippingsWithIds:(NSSet *)clipIds
+{
+	NSMutableArray *removedClippings = [NSMutableArray array];
+	[self delegateBeginUpdates];
+	for ( int i = (int)[jcList count] - 1 ; i >= 0 ; i-- ) {
+		FlycutClipping *clipping = [jcList objectAtIndex:i];
+		// Not reported as about to be deleted: these were deleted on purpose, like a user's delete, so they aren't autosaved as forgotten.
+		if ( ![clipIds containsObject:[clipping clipId]] )
+			continue;
+		[removedClippings addObject:clipping];
+		[jcList removeObjectAtIndex:i];
+		[self delegateDeleteClippingAtIndex:i];
+	}
+	[self persistRemovedClippings:removedClippings];
+	if ( [removedClippings count] )
+		modifiedSinceLastSaveStore = YES;
+	[self delegateEndUpdates];
 }
 
 -(NSArray *) allClippings
@@ -211,7 +325,7 @@
 			[self delegateDeleteClippingAtIndex:i];
 		}
 	}
-	[self persistRemovedClippings:removedClippings];
+	[self persistDroppedClippings:removedClippings];
 	[self delegateEndUpdates];
 }
 
@@ -293,7 +407,7 @@
 				[jcList removeObjectAtIndex:jcRememberNum];
 				[self delegateDeleteClippingAtIndex:jcRememberNum];
 			}
-			[self persistRemovedClippings:removedClippings];
+			[self persistDroppedClippings:removedClippings];
 			[self delegateEndUpdates];
 		}
     }

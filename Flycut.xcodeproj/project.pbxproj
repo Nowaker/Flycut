@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2AC9C28FAF6FFB3578B94A85 /* FlycutFolderSync.m in Sources */ = {isa = PBXBuildFile; fileRef = C420A393102DFDD86BD28D29 /* FlycutFolderSync.m */; };
 		41FADE9AD3858E81FDB5AC19 /* HistoryPanel.m in Sources */ = {isa = PBXBuildFile; fileRef = 6D68A2B7FD2C87403827C66A /* HistoryPanel.m */; };
 		660390D13DB7AC61347A5FB8 /* FlycutHistoryDB.m in Sources */ = {isa = PBXBuildFile; fileRef = 2526B83564A62BCA982378A7 /* FlycutHistoryDB.m */; };
 		77192A2A23D6EA7A00EDB9BC /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 77192A2923D6EA7A00EDB9BC /* AppDelegate.m */; };
@@ -229,6 +230,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		09FA46C581845440BA91AC88 /* FlycutFolderSync.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; name = FlycutFolderSync.h; path = FlycutEngine/FlycutFolderSync.h; sourceTree = SOURCE_ROOT; };
 		1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = /System/Library/Frameworks/Cocoa.framework; sourceTree = "<absolute>"; };
 		13E42FB307B3F0F600E4EEF1 /* CoreData.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreData.framework; path = /System/Library/Frameworks/CoreData.framework; sourceTree = "<absolute>"; };
 		2526B83564A62BCA982378A7 /* FlycutHistoryDB.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = FlycutHistoryDB.m; path = FlycutEngine/FlycutHistoryDB.m; sourceTree = SOURCE_ROOT; };
@@ -339,6 +341,7 @@
 		AABE497A09FF9CD000A6A239 /* AppController.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = AppController.h; sourceTree = "<group>"; };
 		AABE497B09FF9CD000A6A239 /* AppController.m */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.objc; path = AppController.m; sourceTree = "<group>"; };
 		AAFAC84A0A1BD9DD00DC6025 /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = /System/Library/Frameworks/Carbon.framework; sourceTree = "<absolute>"; };
+		C420A393102DFDD86BD28D29 /* FlycutFolderSync.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = FlycutFolderSync.m; path = FlycutEngine/FlycutFolderSync.m; sourceTree = SOURCE_ROOT; };
 		DBEB0C9A1442F2AE0080D24E /* NSWindow+ULIZoomEffect.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSWindow+ULIZoomEffect.h"; sourceTree = "<group>"; };
 		DBEB0C9B1442F2AE0080D24E /* NSWindow+ULIZoomEffect.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSWindow+ULIZoomEffect.m"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -538,6 +541,8 @@
 				77DA6B911CB9549B0077917F /* FlycutClipping.h */,
 				510A9311F16BA6740465B12C /* FlycutHistoryDB.h */,
 				2526B83564A62BCA982378A7 /* FlycutHistoryDB.m */,
+				09FA46C581845440BA91AC88 /* FlycutFolderSync.h */,
+				C420A393102DFDD86BD28D29 /* FlycutFolderSync.m */,
 			);
 			name = FlycutEngine;
 			path = JumpcutEngine;
@@ -1109,6 +1114,7 @@
 				DBEB0C9D1442F2AE0080D24E /* NSWindow+ULIZoomEffect.m in Sources */,
 				660390D13DB7AC61347A5FB8 /* FlycutHistoryDB.m in Sources */,
 				41FADE9AD3858E81FDB5AC19 /* HistoryPanel.m in Sources */,
+				2AC9C28FAF6FFB3578B94A85 /* FlycutFolderSync.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -18,6 +18,7 @@
 #import "FlycutStore.h"
 
 @class FlycutHistoryDB;
+@class FlycutFolderSync;
 
 @protocol FlycutOperatorDelegate <NSObject>
 @optional
@@ -34,6 +35,8 @@
     FlycutStore				*stashedStore;
 
 	FlycutHistoryDB			*historyDB;
+	FlycutFolderSync		*folderSync;
+	NSString				*folderSyncError;
 	NSTimer					*expiryTimer;
 
 	SEL saveSelector;
@@ -92,6 +95,10 @@
 
 // Initialization / cleanup related
 -(void)applicationWillTerminate;;
+
+// Starts, restarts or stops sharing history through the folder in the syncFolderEnabled/syncFolderPath preferences.
+-(void)folderSyncPreferenceDidChange;
+-(NSString *)folderSyncStatus;
 -(void)awakeFromNibDisplaying:(int) displayNum withDisplayLength:(int) displayLength withSaveSelector:(SEL) selector forTarget:(NSObject*) target;
 
 // Favorites Store related

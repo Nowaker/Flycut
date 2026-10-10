@@ -42,6 +42,9 @@ typedef NS_ENUM(int, FlycutHistoryList) {
 - (void)store:(FlycutStore*)store didSaveClipping:(FlycutClipping*)clipping;
 - (void)store:(FlycutStore*)store didRemoveClippings:(NSArray*)clippings;
 - (void)storeDidClear:(FlycutStore*)store;
+@optional
+// Removed by local retention (remember limit, age, a duplicate losing to an equal clipping) rather than by the user.
+- (void)store:(FlycutStore*)store didDropClippings:(NSArray*)clippings;
 @end
 
 @interface FlycutStore : NSObject {
@@ -108,6 +111,13 @@ typedef NS_ENUM(int, FlycutHistoryList) {
 
 // Replace the list with already-persisted clippings, newest first, without reporting them back to persistence
 -(void) loadPersistedClippings:(NSArray *)clippings;
+
+// Place clippings that already have their ids and ranks (from another machine) where their ranks put them.
+// An existing clipping with the same id is replaced; with duplicates removed, of two equal clippings
+// the higher-ranked one stays, so every machine keeps the same one.
+-(void) placeClippings:(NSArray *)clippings;
+-(int) indexOfClippingWithId:(NSString *)clipId;
+-(void) removeClippingsWithIds:(NSSet *)clipIds;
 
 // Delete a clipping
 -(void) clearItem:(int)index;

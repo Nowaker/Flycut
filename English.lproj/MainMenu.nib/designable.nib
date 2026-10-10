@@ -106,6 +106,8 @@
                 <outlet property="prefsPanel" destination="218" id="220"/>
                 <outlet property="saveFromBezelToLabel" destination="GRg-nv-Opa" id="hLw-Hb-VQg"/>
                 <outlet property="secondRecorder" destination="Hpw-sr-001" id="Hpw-so-001"/>
+                <outlet property="syncFolderLabel" destination="Syn-pl-001" id="Syn-ol-001"/>
+                <outlet property="syncStatusLabel" destination="Syn-st-001" id="Syn-ol-002"/>
                 <outlet property="saveToLocationButton" destination="Bqn-So-8E9" id="vh2-7q-lE5"/>
                 <outlet property="savingSectionLabel" destination="g6p-DW-uAA" id="4n5-RC-Ijw"/>
                 <outlet property="searchBox" destination="BYk-Gn-IDB" id="MpX-C1-cdn"/>
@@ -714,6 +716,70 @@
                                                         <rect key="frame" x="14" y="34" width="477" height="16"/>
                                                         <autoresizingMask key="autoresizingMask"/>
                                                         <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="0 keeps clippings forever. Favorites are never deleted by age." id="Hst-ao-001">
+                                                            <font key="font" metaFont="label" size="11"/>
+                                                            <color key="textColor" name="secondaryLabelColor" catalog="System" colorSpace="catalog"/>
+                                                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                                                        </textFieldCell>
+                                                    </textField>
+                                                </subviews>
+                                            </view>
+                                        </box>
+                                        <box fixedFrame="YES" boxType="oldStyle" borderType="none" title="Box" titlePosition="noTitle" translatesAutoresizingMaskIntoConstraints="NO" id="Syn-bx-001">
+                                            <rect key="frame" x="0.0" y="200" width="507" height="160"/>
+                                            <autoresizingMask key="autoresizingMask"/>
+                                            <view key="contentView" id="Syn-cv-001">
+                                                <rect key="frame" x="0.0" y="0.0" width="507" height="160"/>
+                                                <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                                                <subviews>
+                                                    <box verticalHuggingPriority="750" fixedFrame="YES" boxType="separator" translatesAutoresizingMaskIntoConstraints="NO" id="Syn-sp-001">
+                                                        <rect key="frame" x="14" y="152" width="477" height="5"/>
+                                                        <autoresizingMask key="autoresizingMask"/>
+                                                    </box>
+                                                    <button toolTip="Share history with your other machines through a synced folder." fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Syn-cb-001">
+                                                        <rect key="frame" x="14" y="122" width="477" height="18"/>
+                                                        <autoresizingMask key="autoresizingMask"/>
+                                                        <buttonCell key="cell" type="check" title="Sync history through a folder" bezelStyle="regularSquare" imagePosition="left" alignment="left" inset="2" id="Syn-cc-001">
+                                                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                                                            <font key="font" metaFont="system"/>
+                                                        </buttonCell>
+                                                        <connections>
+                                                            <action selector="toggleFolderSync:" target="213" id="Syn-ca-001"/>
+                                                            <binding destination="808" name="value" keyPath="values.syncFolderEnabled" id="Syn-cv-002"/>
+                                                        </connections>
+                                                    </button>
+                                                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Syn-nt-001">
+                                                        <rect key="frame" x="32" y="86" width="459" height="32"/>
+                                                        <autoresizingMask key="autoresizingMask"/>
+                                                        <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="Pick a folder that iCloud Drive, Dropbox or Syncthing keeps in sync. Every machine writes its own file there, unencrypted. Favorites sync too." id="Syn-nc-001">
+                                                            <font key="font" metaFont="label" size="11"/>
+                                                            <color key="textColor" name="secondaryLabelColor" catalog="System" colorSpace="catalog"/>
+                                                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                                                        </textFieldCell>
+                                                    </textField>
+                                                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Syn-pl-001">
+                                                        <rect key="frame" x="32" y="56" width="320" height="17"/>
+                                                        <autoresizingMask key="autoresizingMask"/>
+                                                        <textFieldCell key="cell" lineBreakMode="truncatingMiddle" sendsActionOnEndEditing="YES" title="No folder chosen" id="Syn-pc-001">
+                                                            <font key="font" metaFont="system"/>
+                                                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                                                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                                                        </textFieldCell>
+                                                    </textField>
+                                                    <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Syn-bt-001">
+                                                        <rect key="frame" x="354" y="47" width="140" height="32"/>
+                                                        <autoresizingMask key="autoresizingMask"/>
+                                                        <buttonCell key="cell" type="push" title="Choose Folder…" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="Syn-bc-001">
+                                                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                                                            <font key="font" metaFont="system"/>
+                                                        </buttonCell>
+                                                        <connections>
+                                                            <action selector="chooseSyncFolder:" target="213" id="Syn-ba-001"/>
+                                                        </connections>
+                                                    </button>
+                                                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Syn-st-001">
+                                                        <rect key="frame" x="32" y="14" width="459" height="30"/>
+                                                        <autoresizingMask key="autoresizingMask"/>
+                                                        <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="Off." id="Syn-sc-001">
                                                             <font key="font" metaFont="label" size="11"/>
                                                             <color key="textColor" name="secondaryLabelColor" catalog="System" colorSpace="catalog"/>
                                                             <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>

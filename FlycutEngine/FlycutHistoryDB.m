@@ -10,7 +10,7 @@
 #import <sqlite3.h>
 #import <sys/stat.h>
 
-static const int kSchemaVersion = 1;
+static const int kSchemaVersion = 2;
 
 @implementation FlycutHistoryDB {
 	sqlite3 *db;
@@ -94,6 +94,23 @@ static const int kSchemaVersion = 1;
 				 "PRIMARY KEY (list, id))"]
 			&& [self exec:@"CREATE INDEX clips_by_rank ON clips (list, rank)"]
 			&& [self exec:@"CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT)"]
+			&& [self exec:@"PRAGMA user_version = 1"]
+			&& [self exec:@"COMMIT"];
+		if ( !created ) {
+			[self exec:@"ROLLBACK"];
+			return NO;
+		}
+	}
+	if ( [self schemaVersion] < 2 ) {
+		// The newest change sync has seen per clipping, kept after deletion so an older change can't bring it back.
+		BOOL created = [self exec:@"BEGIN"]
+			&& [self exec:@"CREATE TABLE sync_state ("
+				 "list INTEGER NOT NULL, "
+				 "id TEXT NOT NULL, "
+				 "at INTEGER NOT NULL, "
+				 "machine TEXT NOT NULL, "
+				 "deleted INTEGER NOT NULL DEFAULT 0, "
+				 "PRIMARY KEY (list, id))"]
 			&& [self exec:[NSString stringWithFormat:@"PRAGMA user_version = %d", kSchemaVersion]]
 			&& [self exec:@"COMMIT"];
 		if ( !created ) {
@@ -203,6 +220,60 @@ static NSString *columnString(sqlite3_stmt *statement, int column)
 	[self exec:@"DELETE FROM clips"];
 }
 
+-(FlycutSyncState) syncStateForClipId:(NSString *)clipId inList:(FlycutHistoryList)list
+{
+	FlycutSyncState state = { 0, nil, NO };
+	sqlite3_stmt *statement = NULL;
+	if ( [self prepare:"SELECT at, machine, deleted FROM sync_state WHERE list = ? AND id = ?" into:&statement] ) {
+		sqlite3_bind_int(statement, 1, list);
+		bindString(statement, 2, clipId);
+		if ( sqlite3_step(statement) == SQLITE_ROW ) {
+			state.at = sqlite3_column_int64(statement, 0);
+			state.machine = columnString(statement, 1);
+			state.deleted = sqlite3_column_int(statement, 2) != 0;
+		}
+	}
+	sqlite3_finalize(statement);
+	return state;
+}
+
+-(void) setSyncState:(FlycutSyncState)state forClipId:(NSString *)clipId inList:(FlycutHistoryList)list
+{
+	sqlite3_stmt *statement = NULL;
+	if ( [self prepare:"INSERT OR REPLACE INTO sync_state (list, id, at, machine, deleted) VALUES (?, ?, ?, ?, ?)" into:&statement] ) {
+		sqlite3_bind_int(statement, 1, list);
+		bindString(statement, 2, clipId);
+		sqlite3_bind_int64(statement, 3, state.at);
+		bindString(statement, 4, state.machine ?: @"");
+		sqlite3_bind_int(statement, 5, state.deleted ? 1 : 0);
+		[self step:statement];
+	}
+	sqlite3_finalize(statement);
+}
+
+-(int64_t) latestSyncChangeInList:(FlycutHistoryList)list
+{
+	sqlite3_stmt *statement = NULL;
+	int64_t at = 0;
+	if ( [self prepare:"SELECT MAX(at) FROM sync_state WHERE list = ?" into:&statement] ) {
+		sqlite3_bind_int(statement, 1, list);
+		if ( sqlite3_step(statement) == SQLITE_ROW )
+			at = sqlite3_column_int64(statement, 0);
+	}
+	sqlite3_finalize(statement);
+	return at;
+}
+
+-(void) beginTransaction
+{
+	[self exec:@"BEGIN IMMEDIATE"];
+}
+
+-(void) commitTransaction
+{
+	[self exec:@"COMMIT"];
+}
+
 -(NSString *) metaValueForKey:(NSString *)key
 {
 	sqlite3_stmt *statement = NULL;
@@ -236,13 +307,18 @@ static NSString *columnString(sqlite3_stmt *statement, int column)
 
 - (void)store:(FlycutStore *)store didRemoveClippings:(NSArray *)clippings
 {
-	[self exec:@"BEGIN IMMEDIATE"];
+	[self exec:@"SAVEPOINT remove_clippings"];
 	for ( FlycutClipping *clipping in clippings ) {
 		sqlite3_bind_int(removeStatement, 1, [store persistenceListId]);
 		bindString(removeStatement, 2, [clipping clipId]);
 		[self step:removeStatement];
 	}
-	[self exec:@"COMMIT"];
+	[self exec:@"RELEASE remove_clippings"];
+}
+
+- (void)store:(FlycutStore *)store didDropClippings:(NSArray *)clippings
+{
+	[self store:store didRemoveClippings:clippings];
 }
 
 - (void)storeDidClear:(FlycutStore *)store
