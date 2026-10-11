@@ -1,10 +1,15 @@
-# Flycut
+# Flycut GPT
 
 ## Nowaker fork
 
 This fork uses the macOS app identity `net.nowaker.flycut` and the helper
 identity `net.nowaker.flycuthelper`. The integration branch is
 `master-nowaker-gpt`; `master-nowaker` is not modified by this effort.
+The macOS product is `Flycut GPT.app`, with amber scissors (`#D97706`, the
+Hephaestus agent color) in Finder and the menu bar. Its data identity stays
+unchanged when the app is renamed.
+If an older fork named `Flycut.app` was configured to launch at login,
+re-enable that option after installing the renamed app so it uses the new path.
 
 ### History and search
 
@@ -103,7 +108,7 @@ Enable CloudKit with `FLYCUT_CLOUDKIT=1` and set `FLYCUT_ICLOUD_CONTAINER` to yo
 provisioned container. Unsigned builds verify compilation, not account-backed
 CloudKit sync. Actual paste requires Accessibility authorization for the app.
 Ad-hoc signing does not guarantee that authorization survives rebuilds.
-The Release app is produced at `build/Build/Products/Release/Flycut.app`.
+The Release app is produced at `build/Build/Products/Release/Flycut GPT.app`.
 
 ## Upstream Flycut
 <a href="https://github.com/TermiT/Flycut/releases"><img src="http://a3.mzstatic.com/us/r1000/047/Purple/fb/53/f2/mzi.mcaxwyjm.175x175-75.png" /></a>

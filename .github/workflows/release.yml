@@ -97,8 +97,8 @@ jobs:
     - name: Export and sign app
       run: |
         mkdir -p build/Export
-        cp -R build/Flycut.xcarchive/Products/Applications/Flycut.app build/Export/
-        APP="build/Export/Flycut.app"
+        cp -R "build/Flycut.xcarchive/Products/Applications/Flycut GPT.app" build/Export/
+        APP="build/Export/Flycut GPT.app"
         if [ -n "$SIGNING_IDENTITY" ]; then
           # Sign inside-out with Developer ID + hardened runtime + secure timestamp.
           # Helper + main app use the Developer ID (non-sandbox) entitlements.
@@ -117,9 +117,9 @@ jobs:
     - name: Create DMG
       run: |
         mkdir -p build/dmg-staging
-        cp -R build/Export/Flycut.app build/dmg-staging/
+        cp -R "build/Export/Flycut GPT.app" build/dmg-staging/
         ln -s /Applications build/dmg-staging/Applications
-        hdiutil create -volname "Flycut" -srcfolder build/dmg-staging \
+        hdiutil create -volname "Flycut GPT" -srcfolder build/dmg-staging \
           -ov -format UDZO "$PWD/build/Flycut.dmg"
         ls -lh build/Flycut.dmg
 
@@ -173,8 +173,8 @@ jobs:
           echo "$NOTES"
           echo ""
           echo "## Installation"
-          echo "1. Download the DMG below, open it, and drag Flycut to Applications."
-          echo "2. Launch Flycut and grant Accessibility permission when prompted"
+          echo "1. Download the DMG below, open it, and drag Flycut GPT to Applications."
+          echo "2. Launch Flycut GPT and grant Accessibility permission when prompted"
           echo "   (System Settings > Privacy & Security > Accessibility)."
           echo ""
           echo "**Upgrading and paste stopped working?** Reset the permission and re-grant it:"
@@ -200,7 +200,7 @@ jobs:
       with:
         files: build/Flycut.dmg
         body_path: release_notes.md
-        name: Flycut ${{ steps.get_version.outputs.version }}
+        name: Flycut GPT ${{ steps.get_version.outputs.version }}
         draft: false
         prerelease: false
       env:

@@ -251,8 +251,11 @@
             statusItemWithLength:NSVariableStatusItemLength] retain];
     [statusItem setHighlightMode:YES];
     [self switchMenuIconTo: [[NSUserDefaults standardUserDefaults] integerForKey:@"menuIcon"]];
+    statusItem.button.toolTip = @"Flycut GPT - Clipboard History";
 	[statusItem setMenu:jcMenu];
     [jcMenu setDelegate:self];
+    NSInteger aboutMenuIndex = [jcMenu indexOfItemWithTarget:self andAction:@selector(activateAndOrderFrontStandardAboutPanel:)];
+    if (aboutMenuIndex >= 0) [jcMenu itemAtIndex:aboutMenuIndex].title = @"About Flycut GPT";
     NSInteger clearMenuIndex = [jcMenu indexOfItemWithTarget:self andAction:@selector(clearClippingList:)];
     if (clearMenuIndex >= 0) [jcMenu itemAtIndex:clearMenuIndex].title = @"Clear History...";
     NSMenuItem *historyItem = [[[NSMenuItem alloc] initWithTitle:@"Clipboard History..." action:@selector(showHistoryPanel:) keyEquivalent:@""] autorelease];
@@ -352,16 +355,8 @@
     else
     {
         // We need to do a little trick to get the search box functional.  Figure out what is currently active.
-        NSString *currRunningApp = @"";
-        NSRunningApplication *currApp = nil;
-        for (currApp in [[NSWorkspace sharedWorkspace] runningApplications])
-            if ([currApp isActive])
-            {
-                currRunningApp = [currApp localizedName];
-                break;
-            }
-
-        if ( [currRunningApp rangeOfString:@"Flycut"].location == NSNotFound )
+        NSRunningApplication *currApp = [[NSWorkspace sharedWorkspace] frontmostApplication];
+        if (currApp.processIdentifier != [[NSProcessInfo processInfo] processIdentifier])
         {
             // We haven't activated Flycut yet.
             currentRunningApplication = [currApp retain]; // Remember what app we came from.
@@ -405,13 +400,15 @@
         statusItemText = [statusItem title];
         statusItemImage = [statusItem image];
         [statusItem setTitle: @""];
-        [statusItem setImage: [NSImage imageNamed:@"com.generalarcade.flycut.xout.16.png"]];
+        [statusItem setImage:[NSImage imageNamed:@"FlycutGPTScissorsPaused"]];
+        statusItem.button.toolTip = @"Flycut GPT - Capture paused";
         return true;
     }
     else
     {
         [statusItem setTitle: statusItemText];
         [statusItem setImage: statusItemImage];
+        statusItem.button.toolTip = @"Flycut GPT - Clipboard History";
         statusItemText = nil;
         statusItemImage = nil;
     }
@@ -485,19 +482,10 @@
 
 -(void) switchMenuIconTo:(int)number
 {
-    if (number == 1 ) {
-        [statusItem setTitle:@""];
-        [statusItem setImage:[NSImage imageNamed:@"com.generalarcade.flycut.black.16.png"]];
-    } else if (number == 2 ) {
-        [statusItem setImage:nil];
-        [statusItem setTitle:[NSString stringWithFormat:@"%C",0x2704]];
-    } else if ( number == 3 ) {
-        [statusItem setImage:nil];
-        [statusItem setTitle:[NSString stringWithFormat:@"%C",0x2702]];
-    } else {
-        [statusItem setTitle:@""];
-        [statusItem setImage:[NSImage imageNamed:@"com.generalarcade.flycut.16.png"]];
-    }
+    [statusItem setTitle:@""];
+    NSImage *icon = [NSImage imageNamed:@"FlycutGPTScissors"];
+    icon.template = NO;
+    [statusItem setImage:icon];
 }
 
 -(NSDictionary*) checkPreferencesChanges:(NSDictionary*)changes
@@ -687,18 +675,6 @@
 									  frameMaxY:nextYMax
 										binding:@"bezelHeight"
 										 action:@selector(setBezelHeight:)];
-	[appearancePanel addSubview:row];
-	nextYMax = row.frame.origin.y;
-
-	row = [self preferencePanelPopUpRowForText:@"Menu item icon"
-										 items:[NSArray arrayWithObjects:
-												@"Flycut icon",
-												@"Black Flycut icon",
-												@"White scissors",
-												@"Black scissors",nil]
-									 frameMaxY:nextYMax
-									   binding:@"menuIcon"
-										action:@selector(switchMenuIcon:)];
 	[appearancePanel addSubview:row];
 	nextYMax = row.frame.origin.y;
 
