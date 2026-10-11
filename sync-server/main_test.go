@@ -114,13 +114,15 @@ func TestRejects(t *testing.T) {
 
 func TestListenAddresses(t *testing.T) {
 	for addr, ok := range map[string]bool{
-		"127.0.0.1:8742":      true,
-		"100.105.229.19:8742": true,
-		"[::1]:8742":          true,
-		"localhost:8742":      true,
-		"0.0.0.0:8742":        false,
-		":8742":               false,
-		"[::]:8742":           false,
+		"127.0.0.1:8742":             true,
+		"100.105.229.19:8742":        true,
+		"[::1]:8742":                 true,
+		"localhost:8742":             true,
+		"127.0.0.1:8742, [::1]:8742": true,
+		"127.0.0.1:8742,:8742":       false,
+		"0.0.0.0:8742":               false,
+		":8742":                      false,
+		"[::]:8742":                  false,
 	} {
 		if addrs, err := listenAddresses(addr); (err == nil) != ok || (ok && len(addrs) == 0) {
 			t.Errorf("%s: %v %v", addr, addrs, err)

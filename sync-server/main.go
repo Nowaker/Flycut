@@ -230,10 +230,22 @@ func (s *server) replace(w http.ResponseWriter, r *http.Request, machine string)
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// listenAddresses turns -listen into the addresses to bind: an IP as given, or every address a host
-// name resolves to, so a Tailscale name covers both its IPv4 and IPv6 address. Clipboard history is
-// private, so none of them may be the address that means every interface.
-func listenAddresses(addr string) ([]string, error) {
+// listenAddresses turns -listen, a comma-separated list of host:port, into the addresses to bind: an
+// IP as given, or every address a host name resolves to, so a Tailscale name covers both its IPv4 and
+// IPv6 address. Clipboard history is private, so none of them may be the address that means every interface.
+func listenAddresses(list string) ([]string, error) {
+	var addrs []string
+	for _, addr := range strings.Split(list, ",") {
+		resolved, err := resolveListenAddress(strings.TrimSpace(addr))
+		if err != nil {
+			return nil, err
+		}
+		addrs = append(addrs, resolved...)
+	}
+	return addrs, nil
+}
+
+func resolveListenAddress(addr string) ([]string, error) {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, err
@@ -258,7 +270,7 @@ func listenAddresses(addr string) ([]string, error) {
 }
 
 func main() {
-	listen := flag.String("listen", "127.0.0.1:8742", "host:port to listen on: a loopback or Tailscale address, or a name resolving only to such")
+	listen := flag.String("listen", "127.0.0.1:8742", "comma-separated host:port to listen on: loopback or Tailscale addresses, or names resolving only to such")
 	dataDir := flag.String("data", "", "directory holding the logs")
 	tokenFile := flag.String("token-file", "", "file containing the bearer token clients must send")
 	flag.Parse()
