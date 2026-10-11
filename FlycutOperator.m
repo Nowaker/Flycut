@@ -342,6 +342,10 @@
 
 	[self importLegacyStore:[[NSUserDefaults standardUserDefaults] dictionaryForKey:@"store"] named:@"preferences"];
 	for ( NSString *plistPath in @[appStorePlist, directDownloadPlist] ) {
+		// Even looking into another app's container makes macOS ask the user, so a file that has been imported isn't touched again.
+		if ( nil != [historyDB metaValueForKey:[@"imported:" stringByAppendingString:plistPath]]
+			&& nil != [historyDB metaValueForKey:[@"imported-settings:" stringByAppendingString:plistPath]] )
+			continue;
 		if ( ![[NSFileManager defaultManager] fileExistsAtPath:plistPath] )
 			continue;
 		NSDictionary *preferences = [NSDictionary dictionaryWithContentsOfFile:plistPath];
