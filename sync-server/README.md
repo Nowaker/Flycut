@@ -45,6 +45,23 @@ Preferences > History > Sync history through a server:
 - Token: the contents of the token file. Flycut stores it in the login keychain itself; enter it here
   rather than adding the item with `security`, which macOS 15 makes Flycut ask the keychain password for.
 
+## Credentials
+
+Clipping contents that look like credentials (`FlycutEngine/credential-rules.json`, gitleaks-style rules
+plus a check for lone random-looking words) are sealed by the clients before they reach the server: such a
+put carries `"enc": "v1:..."` instead of `"contents"`, AES-256-CTR with HMAC-SHA256, keys derived from the
+token (format in `FlycutEngine/FlycutSyncCrypto.h`). Reading the logs shows ciphertext for them; every
+client with the token reads them as usual. Flycut shows them in red.
+
+To read one on the server host:
+
+```sh
+flycut-sync-server reveal -data ~/.local/share/flycut-sync-server/logs -token-file ~/.local/share/flycut-sync-server/token
+flycut-sync-server reveal -data ... -token-file ... -id <clipping id>
+```
+
+The first lists sealed clippings (time, id, machine, app, length); the second prints one.
+
 ## API
 
 Every request needs `Authorization: Bearer <token>`.

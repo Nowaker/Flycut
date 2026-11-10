@@ -78,6 +78,7 @@
     [newContents retain];
     clipContents = newContents;
     [old release];
+    credentialState = FlycutCredentialUnknown;
     if ( newDisplayLength  > 0 ) {
         clipDisplayLength = newDisplayLength;
     }
@@ -90,6 +91,7 @@
     [newContents retain];
     clipContents = newContents;
     [old release];
+    credentialState = FlycutCredentialUnknown;
     [self resetDisplayString];
 }
 
@@ -237,6 +239,16 @@
 -(double) rank
 {
     return clipRank;
+}
+
+-(FlycutCredentialState) credentialState
+{
+    return credentialState;
+}
+
+-(void) setCredentialState:(FlycutCredentialState)newState
+{
+    credentialState = newState;
 }
 
 - (BOOL)isEqual:(id)other {

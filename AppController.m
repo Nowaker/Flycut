@@ -14,6 +14,7 @@
 
 #import "AppController.h"
 #import "FlycutServerMirror.h"
+#import "FlycutCredentialDetector.h"
 #import "SGHotKey.h"
 #import "SGHotKeyCenter.h"
 #import "SRRecorderCell.h"
@@ -1555,6 +1556,7 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 		NSArray *menuItems = [[[jcMenu itemArray] reverseObjectEnumerator] allObjects];
 
 		NSArray *clipStrings = [[returnedDisplayStrings reverseObjectEnumerator] allObjects];
+		NSArray *credentialFlags = [[[self credentialFlagsForDisplayed:[returnedDisplayStrings count] containing:search] reverseObjectEnumerator] allObjects];
 
 		// Figure out if the number of menu items is changing and add or remove entries as necessary.
 		// If we remove all of them and add all new ones, the menu won't redraw if the count is unchanged, so just reuse them by changing their title.
@@ -1573,11 +1575,28 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
                                        keyEquivalent:@""];
             [item setTarget:self];
             [item setEnabled:YES];
+            if ( i < [credentialFlags count] && [[credentialFlags objectAtIndex:i] boolValue] )
+                [item setAttributedTitle:[[[NSAttributedString alloc] initWithString:[clipStrings objectAtIndex:i]
+                                                                           attributes:@{NSForegroundColorAttributeName: [NSColor systemRedColor],
+                                                                                        NSFontAttributeName: [NSFont menuFontOfSize:0]}] autorelease]];
             [jcMenu insertItem:item atIndex:0];
             // Way back in 0.2, failure to release the new item here was causing a quite atrocious memory leak.
             [item release];
         }
     });
+}
+
+// Newest first, like the display strings the menu is built from.
+-(NSArray *) credentialFlagsForDisplayed:(NSUInteger)count containing:(NSString *)search
+{
+	NSArray *indexes = [flycutOperator previousIndexes:(int)count containing:search];
+	NSArray *clippings = [flycutOperator clippingsInFavorites:NO];
+	NSMutableArray *flags = [NSMutableArray arrayWithCapacity:count];
+	for ( NSUInteger i = 0; i < count && i < [indexes count]; i++ ) {
+		NSUInteger index = [[indexes objectAtIndex:i] unsignedIntegerValue];
+		[flags addObject:@(index < [clippings count] && [[FlycutCredentialDetector sharedDetector] isCredentialClipping:[clippings objectAtIndex:index]])];
+	}
+	return flags;
 }
 
 -(IBAction)processMenuClippingSelection:(id)sender

@@ -301,6 +301,8 @@
 		return;
 	}
 	serverMirror = [[FlycutServerMirror alloc] initWithServerURL:server token:token localFolder:folder machineId:[folderSync machineId]];
+	// Every client with the token can read credentials; someone reading the server's files can't.
+	[folderSync setCrypto:[[[FlycutSyncCrypto alloc] initWithToken:token] autorelease]];
 	// The first time, what the other machines have is fetched before this machine's history is shared, so their deletions stand.
 	NSString *ownLog = [folder stringByAppendingPathComponent:[[folderSync machineId] stringByAppendingPathExtension:@"jsonl"]];
 	if ( [[NSFileManager defaultManager] fileExistsAtPath:ownLog] )

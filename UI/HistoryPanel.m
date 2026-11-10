@@ -8,6 +8,7 @@
 
 #import "HistoryPanel.h"
 #import <Carbon/Carbon.h>
+#import "FlycutCredentialDetector.h"
 
 static const CGFloat kMargin = 12;
 static const CGFloat kRowHeight = 38;
@@ -488,6 +489,7 @@ static NSString *FoldUndecomposableLetters(NSString *string)
 
 	FlycutClipping *clipping = [shownClippings objectAtIndex:row];
 	cell.textField.stringValue = [self titleForClipping:clipping];
+	cell.textField.textColor = [[FlycutCredentialDetector sharedDetector] isCredentialClipping:clipping] ? [NSColor systemRedColor] : [NSColor labelColor];
 	[(NSTextField *)[cell viewWithTag:2] setStringValue:[self subtitleForClipping:clipping]];
 	cell.imageView.image = [self iconForClipping:clipping];
 	return cell;

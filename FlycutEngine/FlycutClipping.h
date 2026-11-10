@@ -11,6 +11,12 @@
 
 #import <Foundation/Foundation.h>
 
+typedef NS_ENUM(int, FlycutCredentialState) {
+	FlycutCredentialUnknown = 0,
+	FlycutCredentialNo,
+	FlycutCredentialYes,
+};
+
 @interface FlycutClipping : NSObject {
 // What must a clipping hold?
 // The text
@@ -33,6 +39,8 @@
     NSString * clipId;
 // Sort key within a persisted list, higher is more recent
     double clipRank;
+// Whether the contents look like a credential, worked out on first use (FlycutCredentialDetector)
+    FlycutCredentialState credentialState;
 }
 
 -(id) initWithContents:(NSString *)contents withType:(NSString *)type withDisplayLength:(int)displayLength withAppLocalizedName:(NSString *)localizedName withAppBundleURL:(NSString *)bundleURL withTimestamp:(NSInteger)timestamp;
@@ -48,6 +56,7 @@
 -(void) setHasName:(BOOL)newHasName;
 -(void) setClipId:(NSString *)newClipId;
 -(void) setRank:(double)newRank;
+-(void) setCredentialState:(FlycutCredentialState)newState;
 
 // Retrieve values
 -(FlycutClipping *) clipping;
@@ -61,6 +70,7 @@
 -(BOOL) hasName;
 -(NSString *) clipId;
 -(double) rank;
+-(FlycutCredentialState) credentialState;
 
 // Additional functions
 -(void) resetDisplayString;

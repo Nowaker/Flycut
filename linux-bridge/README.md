@@ -1,7 +1,8 @@
 # flycut-copyq-bridge
 
 Syncs a Linux machine's [CopyQ](https://hluk.github.io/CopyQ/) clipboard history with Flycut through
-[flycut-sync-server](../sync-server/README.md). Python 3 standard library only; talks to CopyQ with `copyq eval`.
+[flycut-sync-server](../sync-server/README.md). Python 3 with the `cryptography` package (Arch: `python-cryptography`);
+talks to CopyQ with `copyq eval`.
 
 ## What syncs
 
@@ -12,6 +13,9 @@ Syncs a Linux machine's [CopyQ](https://hluk.github.io/CopyQ/) clipboard history
 | Older Mac clipping (first sync) | Appended at the bottom of the tab |
 | Clipping deleted or history cleared on a Mac | Removed from the tab if among its top 5000 rows |
 
+Credentials (`credential-rules.json`, the same rules Flycut uses) are sealed in the server log and in the
+bridge's state, and opened again when they reach CopyQ; see [Credentials](../sync-server/README.md#credentials).
+
 Not synced: favorites, images and other non-text items, deletions made in CopyQ, CopyQ's ordering of older items.
 Items already in CopyQ when the bridge first starts stay local; `--export-existing N` shares the top N (max 20) once.
 
@@ -19,7 +23,7 @@ Items already in CopyQ when the bridge first starts stay local; `--export-existi
 
 ```sh
 mkdir -p ~/.local/share/flycut-copyq-bridge
-cp flycut-copyq-bridge.py ~/.local/share/flycut-copyq-bridge/
+cp flycut-copyq-bridge.py ../FlycutEngine/credential-rules.json ~/.local/share/flycut-copyq-bridge/
 sed 's|SERVER|http://desktop.example.ts.net:8742|' flycut-copyq-bridge.service > ~/.config/systemd/user/flycut-copyq-bridge.service
 systemctl --user daemon-reload && systemctl --user enable --now flycut-copyq-bridge
 journalctl --user -u flycut-copyq-bridge -f

@@ -371,6 +371,8 @@ static NSString *HexString(NSData *data)
 -(void) uploadOwnLogKnowingServerSize:(long long)serverSize error:(NSString **)errorOut
 {
 	NSString *path = [localFolder stringByAppendingPathComponent:[machineId stringByAppendingPathExtension:@"jsonl"]];
+	// The file number tells a rewritten file (compacted, or with credentials sealed) from one that only grew.
+	NSNumber *fileNumber = [[[NSFileManager defaultManager] attributesOfItemAtPath:path error:nil] objectForKey:NSFileSystemFileNumber];
 	NSData *local = [NSData dataWithContentsOfFile:path];
 	if ( !local )
 		return;
@@ -385,6 +387,7 @@ static NSString *HexString(NSData *data)
 	long long recordedServerSize = [[state objectForKey:@"serverSize"] longLongValue];
 
 	BOOL localUnchangedSinceSent = sent <= complete && [state isKindOfClass:[NSDictionary class]]
+		&& [[state objectForKey:@"file"] isEqual:fileNumber]
 		&& [HexString([local subdataWithRange:NSMakeRange((NSUInteger)(sent - MIN(sent, kTailLength)), (NSUInteger)MIN(sent, kTailLength))]) isEqualToString:sentTail ?: @""];
 	BOOL serverAsSent = serverSize == recordedServerSize && serverSize >= 0;
 	if ( localUnchangedSinceSent && serverAsSent && sent == complete )
@@ -412,7 +415,7 @@ static NSString *HexString(NSData *data)
 		return;
 	}
 
-	NSDictionary *newState = @{@"sent": @(complete), @"serverSize": @(newServerSize),
+	NSDictionary *newState = @{@"sent": @(complete), @"serverSize": @(newServerSize), @"file": fileNumber ?: @0,
 							   @"tail": HexString([local subdataWithRange:NSMakeRange(complete - MIN(complete, kTailLength), MIN(complete, kTailLength))])};
 	[[NSJSONSerialization dataWithJSONObject:newState options:0 error:nil] writeToFile:[self uploadStatePath] atomically:YES];
 }

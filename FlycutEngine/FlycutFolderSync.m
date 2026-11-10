@@ -47,7 +47,7 @@ static NSString *HexString(NSData *data)
 	NSMutableDictionary *pendingChanges[2];	// per list: clip id -> clipping to place, or NSNull to remove
 }
 
-@synthesize folder, machineId, lastError, pollInterval, compactionThreshold, didApplyRemoteChanges;
+@synthesize folder, machineId, lastError, pollInterval, compactionThreshold, didApplyRemoteChanges, crypto, credentialDetector;
 
 -(instancetype) initWithFolder:(NSString *)aFolder
 					 historyDB:(FlycutHistoryDB *)aHistoryDB
@@ -67,6 +67,7 @@ static NSString *HexString(NSData *data)
 	pollInterval = 2.0;
 	compactionThreshold = 1000;
 	machineId = [[self loadOrCreateMachineId] copy];
+	credentialDetector = [[FlycutCredentialDetector sharedDetector] retain];
 	return self;
 }
 
@@ -127,8 +128,10 @@ static NSString *HexString(NSData *data)
 	[self poll];
 	if ( ![[NSFileManager defaultManager] fileExistsAtPath:[self ownLogPath]] )
 		[self exportHistory];
-	else
+	else {
+		[self sealCredentialsInOwnLogIfNeeded];
 		[self compactOwnLogIfNeeded];
+	}
 
 	[pollTimer invalidate];
 	[pollTimer release];
@@ -195,6 +198,7 @@ static NSString *HexString(NSData *data)
 	NSMutableDictionary *event = [NSMutableDictionary dictionaryWithDictionary:@{
 		@"v": @1, @"op": @"put", @"list": @(list), @"id": [clipping clipId], @"at": @(at), @"m": machineId,
 		@"rank": @([clipping rank]), @"contents": [clipping contents] ?: @"", @"ts": @([clipping timestamp])}];
+	[self sealContentsOfEvent:event];
 	if ( [clipping type] )
 		[event setObject:[clipping type] forKey:@"type"];
 	if ( [clipping appLocalizedName] )
@@ -202,6 +206,20 @@ static NSString *HexString(NSData *data)
 	if ( [clipping appBundleURL] )
 		[event setObject:[clipping appBundleURL] forKey:@"appPath"];
 	return event;
+}
+
+// Replaces a credential's "contents" with its sealed form "enc". Returns whether it did.
+-(BOOL) sealContentsOfEvent:(NSMutableDictionary *)event
+{
+	NSString *contents = [event objectForKey:@"contents"];
+	if ( !crypto || ![contents isKindOfClass:[NSString class]] || ![credentialDetector isCredential:contents] )
+		return NO;
+	NSString *sealed = [crypto seal:contents];
+	if ( !sealed )
+		return NO;
+	[event setObject:sealed forKey:@"enc"];
+	[event removeObjectForKey:@"contents"];
+	return YES;
 }
 
 -(NSData *) recordLocalPutOfClipping:(FlycutClipping *)clipping inList:(FlycutHistoryList)list
@@ -424,6 +442,8 @@ static NSString *HexString(NSData *data)
 
 	if ( [op isEqualToString:@"put"] ) {
 		NSString *contents = [event objectForKey:@"contents"];
+		if ( nil == contents && nil != [event objectForKey:@"enc"] )
+			contents = [crypto open:[event objectForKey:@"enc"]];
 		if ( ![contents isKindOfClass:[NSString class]] || [contents length] == 0 )
 			return NO;
 		[historyDB setSyncState:(FlycutSyncState){ at, machine, NO } forClipId:clipId inList:list];
@@ -490,6 +510,60 @@ static NSString *HexString(NSData *data)
 	return [removed count] > 0;
 }
 
+#pragma mark Sealing
+
+// Seals credentials this machine wrote in plain text, once per version of the credential rules, so they
+// disappear from the file (and from the server, which the file is mirrored to) rather than only from new lines.
+-(void) sealCredentialsInOwnLogIfNeeded
+{
+	if ( !crypto || !credentialDetector )
+		return;
+	NSString *doneKey = [NSString stringWithFormat:@"sync-sealed:%d:%@", [credentialDetector rulesVersion], folder];
+	if ( nil != [historyDB metaValueForKey:doneKey] )
+		return;
+
+	NSData *data = [NSData dataWithContentsOfFile:[self ownLogPath]];
+	NSString *text = data ? [[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] autorelease] : nil;
+	if ( !text ) {
+		[self setLastError:[NSString stringWithFormat:@"cannot read %@ to seal its credentials", [self ownLogPath]]];
+		return;
+	}
+	NSMutableData *rewritten = [NSMutableData dataWithCapacity:[data length]];
+	NSUInteger sealedCount = 0;
+	for ( NSString *line in [text componentsSeparatedByString:@"\n"] ) {
+		if ( [line length] == 0 )
+			continue;
+		NSMutableDictionary *event = [NSJSONSerialization JSONObjectWithData:[line dataUsingEncoding:NSUTF8StringEncoding]
+																	 options:NSJSONReadingMutableContainers error:nil];
+		if ( [event isKindOfClass:[NSMutableDictionary class]] && [[event objectForKey:@"op"] isEqual:@"put"] && [self sealContentsOfEvent:event] ) {
+			[rewritten appendData:[self lineForEvent:event]];
+			sealedCount++;
+			continue;
+		}
+		[rewritten appendData:[line dataUsingEncoding:NSUTF8StringEncoding]];
+		[rewritten appendBytes:"\n" length:1];
+	}
+	if ( sealedCount > 0 && ![self replaceOwnLogWith:rewritten] )
+		return;
+	[historyDB setMetaValue:[NSString stringWithFormat:@"%lu", (unsigned long)sealedCount] forKey:doneKey];
+	if ( sealedCount > 0 )
+		NSLog(@"Flycut sync: sealed %lu credential clipping(s) in %@", (unsigned long)sealedCount, [self ownLogPath]);
+}
+
+// Written beside the file and renamed over it, so readers see the old or the new one.
+-(BOOL) replaceOwnLogWith:(NSData *)data
+{
+	NSString *temporaryPath = [[self ownLogPath] stringByAppendingPathExtension:@"rewriting"];
+	if ( ![data writeToFile:temporaryPath atomically:NO]
+		|| chmod([temporaryPath fileSystemRepresentation], 0600) != 0
+		|| rename([temporaryPath fileSystemRepresentation], [[self ownLogPath] fileSystemRepresentation]) != 0 ) {
+		[[NSFileManager defaultManager] removeItemAtPath:temporaryPath error:nil];
+		[self setLastError:[NSString stringWithFormat:@"cannot rewrite %@", [self ownLogPath]]];
+		return NO;
+	}
+	return YES;
+}
+
 #pragma mark Compaction
 
 // Keeps only the newest event per clipping (and the newest clear per list) once the file has grown to
@@ -535,14 +609,8 @@ static NSString *HexString(NSData *data)
 		[compacted appendBytes:"\n" length:1];
 	}
 
-	NSString *temporaryPath = [[self ownLogPath] stringByAppendingPathExtension:@"compacting"];
-	if ( ![compacted writeToFile:temporaryPath atomically:NO]
-		|| rename([temporaryPath fileSystemRepresentation], [[self ownLogPath] fileSystemRepresentation]) != 0 ) {
-		[[NSFileManager defaultManager] removeItemAtPath:temporaryPath error:nil];
-		[self setLastError:[NSString stringWithFormat:@"cannot compact %@", [self ownLogPath]]];
+	if ( ![self replaceOwnLogWith:compacted] )
 		return;
-	}
-	chmod([[self ownLogPath] fileSystemRepresentation], 0600);
 	NSLog(@"Flycut sync: compacted %@ from %lu to %lu events", [self ownLogPath], (unsigned long)eventCount, (unsigned long)[latest count]);
 }
 
@@ -558,6 +626,8 @@ static NSString *HexString(NSData *data)
 	[clippingStore release];
 	[favoritesStore release];
 	[otherMachines release];
+	[crypto release];
+	[credentialDetector release];
 	[pendingChanges[FlycutHistoryListClippings] release];
 	[pendingChanges[FlycutHistoryListFavorites] release];
 	[super dealloc];

@@ -9,6 +9,8 @@
 //	POST /v1/logs/<machine>          append complete lines; 409 with X-Log-Size if X-Log-Offset isn't the current size
 //	PUT  /v1/logs/<machine>          replace the log (after a client compacts it)
 //
+// Clients seal credential clippings in their logs (seal.go); `flycut-sync-server reveal` reads them back.
+//
 // Every request needs "Authorization: Bearer <token>", the token read from -token-file.
 package main
 
@@ -270,6 +272,12 @@ func resolveListenAddress(addr string) ([]string, error) {
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "reveal" {
+		if err := reveal(os.Args[2:]); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 	listen := flag.String("listen", "127.0.0.1:8742", "comma-separated host:port to listen on: loopback or Tailscale addresses, or names resolving only to such")
 	dataDir := flag.String("data", "", "directory holding the logs")
 	tokenFile := flag.String("token-file", "", "file containing the bearer token clients must send")

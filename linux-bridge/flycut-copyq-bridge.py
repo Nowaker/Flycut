@@ -13,14 +13,20 @@ What it does and doesn't carry, given what CopyQ offers:
 - Favorites, images and other non-text items are not synced. CopyQ's own ordering of older items
   is left alone. Deleting an item in CopyQ isn't shared.
 - Only the tab's top rows are read: CopyQ reads its items one by one, about 0.7 ms each.
+- Credentials (credential-rules.json, shared with Flycut, kept next to this script) are sealed in the
+  server log and in this bridge's state, with keys derived from the server token, as Flycut does
+  (FlycutEngine/FlycutSyncCrypto.h). Sealing uses the `cryptography` package (python-cryptography).
 
 Usage: flycut-copyq-bridge.py --server http://desktop.example.ts.net:8742 --token-file ~/.local/share/flycut-sync-server/token
 """
 
 import argparse
+import base64
 import hashlib
+import hmac
 import json
 import logging
+import math
 import os
 import re
 import socket
@@ -31,6 +37,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+from collections import Counter
 
 TAIL = 32  # bytes of a log kept to recognise it was rewritten
 WATCHED_ROWS = 20  # top rows compared between polls to find new copies
@@ -55,6 +62,108 @@ def newer(at, machine, other_at, other_machine):
 
 def digest(text):
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def shannon_entropy(text):
+    counts = Counter(text)
+    return -sum(n / len(text) * math.log2(n / len(text)) for n in counts.values()) if text else 0.0
+
+
+class CredentialDetector:
+    """credential-rules.json, applied as FlycutCredentialDetector.m does."""
+
+    def __init__(self, path):
+        with open(path, encoding="utf-8") as f:
+            config = json.load(f)
+        self.version = config["version"]
+        self.scan_limit = config.get("scanLimit", 65536)
+        self.rules = [(rule["id"], re.compile(rule["regex"]), rule.get("keywords", []), rule.get("entropy", 0),
+                       [re.compile(allow) for allow in rule.get("allowSecret", [])]) for rule in config["rules"]]
+        self.standalone = config.get("standalone")
+        self.allow = [re.compile(allow) for allow in self.standalone.get("allow", [])] if self.standalone else []
+
+    def lone_random_word(self, word):
+        s = self.standalone
+        if not s["minLength"] <= len(word) <= s["maxLength"] or any(c.isspace() for c in word):
+            return False
+        if any(allow.search(word) for allow in self.allow):
+            return False
+        lower = any("a" <= c <= "z" for c in word)
+        upper = any("A" <= c <= "Z" for c in word)
+        digit = any("0" <= c <= "9" for c in word)
+        other = any(not c.isascii() or not c.isalnum() for c in word)
+        token_characters_only = all(c.isascii() and (c.isalnum() or c in "_+/=.-") for c in word)
+        digit_runs = len(re.findall(r"[0-9]+", word))
+        longest_run = max((len(run) for run in re.findall(r"[A-Za-z0-9]+", word)), default=0)
+        entropy = shannon_entropy(word)
+        if lower and upper and digit and other and entropy >= s["passwordEntropy"]:
+            return True
+        return (token_characters_only and (lower or upper) and digit and len(word) >= s["tokenMinLength"]
+                and digit_runs >= s["tokenDigitRuns"] and longest_run >= s["tokenLongestRun"]
+                and entropy >= s["tokenEntropy"])
+
+    def rule_in(self, text):
+        text = text[:self.scan_limit].strip()
+        if not text:
+            return None
+        lowercase = text.lower()
+        for rule_id, regex, keywords, entropy, allow_secret in self.rules:
+            if keywords and not any(keyword in lowercase for keyword in keywords):
+                continue
+            for match in regex.finditer(text):
+                secret = match.group(1) if regex.groups and match.group(1) is not None else match.group(0)
+                if entropy and shannon_entropy(secret) < entropy:
+                    continue
+                if not any(allow.search(secret) for allow in allow_secret):
+                    return rule_id
+        if self.standalone and self.lone_random_word(text):
+            return "standalone"
+        return None
+
+    def is_credential(self, text):
+        return self.rule_in(text) is not None
+
+
+class SyncCrypto:
+    """The sealed format of FlycutEngine/FlycutSyncCrypto.h: "v1:" + base64(nonce || AES-256-CTR || HMAC-SHA256)."""
+
+    def __init__(self, token):
+        prk = hmac.new(b"flycut-sync", token.encode("utf-8"), hashlib.sha256).digest()
+        okm, block = b"", b""
+        for counter in (1, 2):
+            block = hmac.new(prk, block + b"clipping contents v1" + bytes([counter]), hashlib.sha256).digest()
+            okm += block
+        self.encryption_key, self.mac_key = okm[:32], okm[32:]
+
+    def _ctr(self, nonce, data):
+        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+        cryptor = Cipher(algorithms.AES(self.encryption_key), modes.CTR(nonce)).encryptor()
+        return cryptor.update(data) + cryptor.finalize()
+
+    def _tag(self, nonce, ciphertext):
+        return hmac.new(self.mac_key, b"flycut-v1" + nonce + ciphertext, hashlib.sha256).digest()
+
+    def seal(self, plaintext):
+        nonce = os.urandom(16)
+        ciphertext = self._ctr(nonce, plaintext.encode("utf-8"))
+        return "v1:" + base64.b64encode(nonce + ciphertext + self._tag(nonce, ciphertext)).decode("ascii")
+
+    def open(self, sealed):
+        if not isinstance(sealed, str) or not sealed.startswith("v1:"):
+            return None
+        try:
+            data = base64.b64decode(sealed[3:], validate=True)
+        except ValueError:
+            return None
+        if len(data) < 48:
+            return None
+        nonce, ciphertext, tag = data[:16], data[16:-32], data[-32:]
+        if not hmac.compare_digest(tag, self._tag(nonce, ciphertext)):
+            return None
+        try:
+            return self._ctr(nonce, ciphertext).decode("utf-8")
+        except UnicodeDecodeError:
+            return None
 
 
 class CopyQ:
@@ -130,7 +239,10 @@ class Bridge:
     def __init__(self, args):
         self.copyq = CopyQ(args.tab)
         with open(os.path.expanduser(args.token_file)) as f:
-            self.server = Server(args.server, f.read().strip())
+            token = f.read().strip()
+        self.server = Server(args.server, token)
+        self.crypto = SyncCrypto(token)
+        self.detector = CredentialDetector(os.path.expanduser(args.rules))
         self.state_dir = os.path.expanduser(args.state_dir)
         os.makedirs(self.state_dir, mode=0o700, exist_ok=True)
         self.db = sqlite3.connect(os.path.join(self.state_dir, "state.sqlite"))
@@ -148,6 +260,7 @@ class Bridge:
         self.just_inserted = set()
         self.export_existing = args.export_existing
         self.last_error = None
+        self.seal_own_log()
 
     # State
 
@@ -166,16 +279,67 @@ class Bridge:
         return machine
 
     def clip(self, clip_id):
-        return self.db.execute("SELECT at, machine, deleted, contents FROM clips WHERE id = ?", (clip_id,)).fetchone()
+        row = self.db.execute("SELECT at, machine, deleted, contents FROM clips WHERE id = ?", (clip_id,)).fetchone()
+        if row and row[3] and row[3].startswith("v1:"):
+            row = (*row[:3], self.crypto.open(row[3]))
+        return row
 
     def live_id_for(self, text):
         row = self.db.execute("SELECT id FROM clips WHERE hash = ? AND deleted = 0 ORDER BY at DESC LIMIT 1",
                               (digest(text),)).fetchone()
         return row[0] if row else None
 
+    # Credentials are kept sealed here too, so neither this state nor the server log shows them.
     def set_clip(self, clip_id, at, machine, deleted, contents):
+        stored = self.crypto.seal(contents) if contents and self.detector.is_credential(contents) else contents
         self.db.execute("INSERT OR REPLACE INTO clips (id, at, machine, deleted, hash, contents) VALUES (?, ?, ?, ?, ?, ?)",
-                        (clip_id, at, machine, 1 if deleted else 0, digest(contents) if contents else None, contents))
+                        (clip_id, at, machine, 1 if deleted else 0, digest(contents) if contents else None, stored))
+
+    def seal_event(self, event):
+        text = event.get("contents")
+        if not isinstance(text, str) or not self.detector.is_credential(text):
+            return False
+        event["enc"] = self.crypto.seal(text)
+        del event["contents"]
+        return True
+
+    # Seals credentials this bridge shared in plain text before, once per rules version, as Flycut does, and
+    # makes the next upload replace the server's copy.
+    def seal_own_log(self):
+        done_key = f"sealed:{self.detector.version}"
+        if self.meta(done_key) is not None:
+            return
+        sealed, lines = 0, []
+        try:
+            with open(self.own_log, encoding="utf-8") as f:
+                for line in f:
+                    line = line.rstrip("\n")
+                    if not line:
+                        continue
+                    try:
+                        event = json.loads(line)
+                    except ValueError:
+                        lines.append(line)
+                        continue
+                    if isinstance(event, dict) and event.get("op") == "put" and self.seal_event(event):
+                        sealed += 1
+                        line = json.dumps(event, ensure_ascii=False, separators=(",", ":"))
+                    lines.append(line)
+        except FileNotFoundError:
+            pass
+        if sealed:
+            temporary = self.own_log + ".rewriting"
+            with open(os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w", encoding="utf-8") as f:
+                f.write("".join(line + "\n" for line in lines))
+            os.replace(temporary, self.own_log)
+            self.set_meta("sent", "-1")
+        for row in self.db.execute("SELECT id, at, machine, deleted, contents FROM clips").fetchall():
+            if row[4] and not row[4].startswith("v1:") and self.detector.is_credential(row[4]):
+                self.set_clip(*row)
+        self.set_meta(done_key, str(sealed))
+        self.db.commit()
+        if sealed:
+            log.info("sealed %d credential clipping(s) in %s", sealed, self.own_log)
 
     def clear_marker(self):
         parts = (self.meta("clear") or "").split(" ", 1)
@@ -196,6 +360,7 @@ class Bridge:
         event = {"v": 1, "op": "put", "list": HISTORY_LIST, "id": clip_id, "at": at, "m": self.machine,
                  "rank": time.time(), "contents": text, "type": "NSStringPboardType", "app": host,
                  "ts": int(time.time())}
+        self.seal_event(event)
         with open(self.own_log, "a", encoding="utf-8") as f:
             f.write(json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\n")
         os.chmod(self.own_log, 0o600)
@@ -264,6 +429,8 @@ class Bridge:
                 continue
             if op == "put":
                 text = event.get("contents")
+                if text is None and "enc" in event:
+                    text = self.crypto.open(event["enc"])
                 if not isinstance(text, str) or not text or len(text) > MAX_TEXT:
                     continue
                 self.set_clip(clip_id, at, machine, False, text)
@@ -378,6 +545,8 @@ def main():
     parser.add_argument("--token-file", required=True, help="file holding the server's bearer token")
     parser.add_argument("--tab", default=None, help="CopyQ tab to sync (default: CopyQ's clipboard tab)")
     parser.add_argument("--state-dir", default="~/.local/share/flycut-copyq-bridge")
+    parser.add_argument("--rules", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "credential-rules.json"),
+                        help="credential rules shared with Flycut (default: credential-rules.json next to this script)")
     parser.add_argument("--interval", type=float, default=2.0, help="seconds between checks")
     parser.add_argument("--export-existing", type=int, default=0, metavar="N",
                         help="on the very first run, also share the tab's top N items (at most %d)" % WATCHED_ROWS)

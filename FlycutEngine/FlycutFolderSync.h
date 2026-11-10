@@ -24,6 +24,8 @@
 #import <Foundation/Foundation.h>
 #import "FlycutStore.h"
 #import "FlycutHistoryDB.h"
+#import "FlycutSyncCrypto.h"
+#import "FlycutCredentialDetector.h"
 
 @interface FlycutFolderSync : NSObject <FlycutStorePersistence>
 
@@ -47,6 +49,13 @@
 @property (nonatomic, readonly) NSUInteger otherMachineCount;
 @property (nonatomic, assign) NSTimeInterval pollInterval;	// default 2 seconds
 @property (nonatomic, assign) NSUInteger compactionThreshold;	// own-file lines before compacting; default 1000
+
+// With a crypto, credential clippings are written as {"enc": sealed text} instead of "contents", and
+// sealed clippings from other machines are opened; without one, sealed clippings can't be read and are skipped.
+// The first start with a crypto (and again whenever the credential rules change) rewrites this machine's file so
+// credentials it wrote before are sealed too.
+@property (nonatomic, retain) FlycutSyncCrypto *crypto;
+@property (nonatomic, retain) FlycutCredentialDetector *credentialDetector;	// default: the shared one
 
 // Called on the main thread after changes from other machines were applied to the stores.
 @property (nonatomic, copy) void (^didApplyRemoteChanges)(void);
