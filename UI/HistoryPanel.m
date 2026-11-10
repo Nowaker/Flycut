@@ -343,6 +343,11 @@ static NSString *FoldUndecomposableLetters(NSString *string)
 		: [NSString stringWithFormat:@"%lu of %lu clippings", (unsigned long)[shownClippings count], (unsigned long)[allClippings count]];
 	NSString *other = showsFavorites ? @"history" : @"favorites";
 	statusLabel.stringValue = [NSString stringWithFormat:@"%@     ⏎ paste    ⌘⏎ copy    ⌘⌫ delete    ⇥ %@    esc close", count, other];
+	if ( self.recordingPaused ) {
+		statusLabel.stringValue = [@"Not recording copies (option-click ✄ to resume) · " stringByAppendingString:statusLabel.stringValue];
+		statusLabel.textColor = [NSColor systemRedColor];
+	} else
+		statusLabel.textColor = [NSColor secondaryLabelColor];
 }
 
 #pragma mark Choosing

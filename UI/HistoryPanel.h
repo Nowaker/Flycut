@@ -28,6 +28,9 @@
 /** not retained */
 @property (nonatomic, assign) id<HistoryPanelDelegate> historyDelegate;
 
+/** Copies aren't being recorded; the status line says so. */
+@property (nonatomic, assign) BOOL recordingPaused;
+
 - (instancetype)initWithHistoryDelegate:(id<HistoryPanelDelegate>)delegate;
 
 - (void)showOnActiveScreen;

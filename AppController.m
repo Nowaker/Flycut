@@ -295,10 +295,20 @@
 				 forKey:@"displayNum"];
 }
 
+// An option-click on the menu icon pauses or resumes recording. [NSApp currentEvent] is only the click when a click
+// opened the menu: a menu opened another way (by Accessibility, as a menu-bar manager like uBar does, or again
+// after activation) sees whatever event Flycut handled last, such as the option-command-V hotkey, and used to
+// pause recording silently. So it takes a mouse-down that has option held down now.
+-(BOOL) menuOpenedByOptionClick
+{
+	NSEventType type = [[NSApp currentEvent] type];
+	BOOL click = type == NSEventTypeLeftMouseDown || type == NSEventTypeRightMouseDown || type == NSEventTypeOtherMouseDown;
+	return click && ([NSEvent modifierFlags] & NSEventModifierFlagOption);
+}
+
 -(void)menuWillOpen:(NSMenu *)menu
 {
-    NSEvent *event = [NSApp currentEvent];
-    if([event modifierFlags] & NSAlternateKeyMask) {
+    if ( [self menuOpenedByOptionClick] ) {
         [menu cancelTracking];
         bool disableStore = [self toggleMenuIconDisabled];
         if (!disableStore)
@@ -370,12 +380,14 @@
         statusItemImage = [statusItem image];
         [statusItem setTitle: @""];
         [statusItem setImage: [NSImage imageNamed:@"com.generalarcade.flycut.xout.16.png"]];
+        [[statusItem button] setToolTip:@"Not recording copies. Option-click to resume."];
         return true;
     }
     else
     {
         statusItemText = nil;
         statusItemImage = nil;
+        [[statusItem button] setToolTip:nil];
         [self switchMenuIconTo:(int)[[NSUserDefaults standardUserDefaults] integerForKey:@"menuIcon"]];
     }
     return false;
@@ -1335,6 +1347,7 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 			[historyPanel selectNext];
 	} else {
 		[self restoreStashedStoreAndUpdate];
+		historyPanel.recordingPaused = [flycutOperator storeDisabled];
 		[historyPanel showOnActiveScreen];
 	}
 }
