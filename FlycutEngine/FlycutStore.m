@@ -236,12 +236,12 @@ static BOOL ClippingOutranks(FlycutClipping *a, FlycutClipping *b)
 	NSMutableSet *seenContents = [self removeDuplicates] ? [NSMutableSet set] : nil;
 	for ( FlycutClipping *clipping in candidates ) {
 		if ( seenContents ) {
-			if ( [seenContents containsObject:[clipping contents]] ) {
+			if ( [seenContents containsObject:[clipping dedupeKey]] ) {
 				if ( ![incoming objectForKey:[clipping clipId]] )
 					[droppedClippings addObject:clipping];
 				continue;
 			}
-			[seenContents addObject:[clipping contents]];
+			[seenContents addObject:[clipping dedupeKey]];
 		}
 		[placed addObject:clipping];
 	}

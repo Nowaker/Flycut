@@ -12,6 +12,7 @@
 
 static NSString *const kPrefix = @"v1:";
 static const char kTagLabel[] = "flycut-v1";
+static const char kBlobNonceLabel[] = "flycut-blob-v1";
 enum { kNonceLength = 16, kTagLength = CC_SHA256_DIGEST_LENGTH, kKeyLength = 32 };
 
 static NSData *HMAC(NSData *key, NSData *message)
@@ -75,18 +76,31 @@ static NSData *AESCTR(NSData *key, NSData *nonce, NSData *input)
 	return HMAC(macKey, message);
 }
 
--(NSString *) seal:(NSString *)plaintext
+-(NSData *) sealData:(NSData *)plaintext withNonce:(NSData *)nonce
 {
-	NSMutableData *nonce = [NSMutableData dataWithLength:kNonceLength];
-	if ( SecRandomCopyBytes(kSecRandomDefault, kNonceLength, [nonce mutableBytes]) != errSecSuccess )
-		return nil;
-	NSData *ciphertext = AESCTR(encryptionKey, nonce, [plaintext dataUsingEncoding:NSUTF8StringEncoding]);
+	NSData *ciphertext = AESCTR(encryptionKey, nonce, plaintext);
 	if ( !ciphertext )
 		return nil;
 	NSMutableData *sealed = [NSMutableData dataWithData:nonce];
 	[sealed appendData:ciphertext];
 	[sealed appendData:[self tagForNonce:nonce ciphertext:ciphertext]];
-	return [kPrefix stringByAppendingString:[sealed base64EncodedStringWithOptions:0]];
+	return sealed;
+}
+
+-(NSString *) seal:(NSString *)plaintext
+{
+	NSMutableData *nonce = [NSMutableData dataWithLength:kNonceLength];
+	if ( SecRandomCopyBytes(kSecRandomDefault, kNonceLength, [nonce mutableBytes]) != errSecSuccess )
+		return nil;
+	NSData *sealed = [self sealData:[plaintext dataUsingEncoding:NSUTF8StringEncoding] withNonce:nonce];
+	return sealed ? [kPrefix stringByAppendingString:[sealed base64EncodedStringWithOptions:0]] : nil;
+}
+
+-(NSData *) sealData:(NSData *)data
+{
+	NSMutableData *message = [NSMutableData dataWithBytes:kBlobNonceLabel length:strlen(kBlobNonceLabel)];
+	[message appendData:data];
+	return [self sealData:data withNonce:[HMAC(macKey, message) subdataWithRange:NSMakeRange(0, kNonceLength)]];
 }
 
 -(NSString *) open:(NSString *)sealed
@@ -94,6 +108,12 @@ static NSData *AESCTR(NSData *key, NSData *nonce, NSData *input)
 	if ( ![sealed isKindOfClass:[NSString class]] || ![sealed hasPrefix:kPrefix] )
 		return nil;
 	NSData *data = [[[NSData alloc] initWithBase64EncodedString:[sealed substringFromIndex:[kPrefix length]] options:0] autorelease];
+	NSData *plaintext = [self openData:data];
+	return plaintext ? [[[NSString alloc] initWithData:plaintext encoding:NSUTF8StringEncoding] autorelease] : nil;
+}
+
+-(NSData *) openData:(NSData *)data
+{
 	if ( [data length] < kNonceLength + kTagLength )
 		return nil;
 	NSData *nonce = [data subdataWithRange:NSMakeRange(0, kNonceLength)];
@@ -107,8 +127,7 @@ static NSData *AESCTR(NSData *key, NSData *nonce, NSData *input)
 		difference |= a[i] ^ b[i];
 	if ( difference )
 		return nil;
-	NSData *plaintext = AESCTR(encryptionKey, nonce, ciphertext);
-	return plaintext ? [[[NSString alloc] initWithData:plaintext encoding:NSUTF8StringEncoding] autorelease] : nil;
+	return AESCTR(encryptionKey, nonce, ciphertext);
 }
 
 -(void) dealloc

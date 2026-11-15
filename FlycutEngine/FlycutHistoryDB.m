@@ -10,7 +10,7 @@
 #import <sqlite3.h>
 #import <sys/stat.h>
 
-static const int kSchemaVersion = 2;
+static const int kSchemaVersion = 3;
 
 @implementation FlycutHistoryDB {
 	sqlite3 *db;
@@ -111,9 +111,21 @@ static const int kSchemaVersion = 2;
 				 "machine TEXT NOT NULL, "
 				 "deleted INTEGER NOT NULL DEFAULT 0, "
 				 "PRIMARY KEY (list, id))"]
-			&& [self exec:[NSString stringWithFormat:@"PRAGMA user_version = %d", kSchemaVersion]]
+			&& [self exec:@"PRAGMA user_version = 2"]
 			&& [self exec:@"COMMIT"];
 		if ( !created ) {
+			[self exec:@"ROLLBACK"];
+			return NO;
+		}
+	}
+	if ( [self schemaVersion] < 3 ) {
+		// The pasteboard items as JSON (see FlycutClipping -items), and whether contents only describes them.
+		BOOL added = [self exec:@"BEGIN"]
+			&& [self exec:@"ALTER TABLE clips ADD COLUMN items TEXT"]
+			&& [self exec:@"ALTER TABLE clips ADD COLUMN described INTEGER NOT NULL DEFAULT 0"]
+			&& [self exec:[NSString stringWithFormat:@"PRAGMA user_version = %d", kSchemaVersion]]
+			&& [self exec:@"COMMIT"];
+		if ( !added ) {
 			[self exec:@"ROLLBACK"];
 			return NO;
 		}
@@ -132,7 +144,7 @@ static const int kSchemaVersion = 2;
 
 -(BOOL) prepareStatements
 {
-	return [self prepare:"INSERT OR REPLACE INTO clips (list, id, rank, contents, type, app_name, app_bundle_path, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)" into:&saveStatement]
+	return [self prepare:"INSERT OR REPLACE INTO clips (list, id, rank, contents, type, app_name, app_bundle_path, timestamp, items, described) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)" into:&saveStatement]
 		&& [self prepare:"DELETE FROM clips WHERE list = ? AND id = ?" into:&removeStatement]
 		&& [self prepare:"DELETE FROM clips WHERE list = ?" into:&clearStatement];
 }
@@ -155,6 +167,22 @@ static NSString *columnString(sqlite3_stmt *statement, int column)
 	return [[[NSString alloc] initWithBytes:bytes length:sqlite3_column_bytes(statement, column) encoding:NSUTF8StringEncoding] autorelease];
 }
 
+static NSString *ItemsJSON(NSArray *items)
+{
+	if ( [items count] == 0 )
+		return nil;
+	NSData *json = [NSJSONSerialization dataWithJSONObject:items options:0 error:nil];
+	return json ? [[[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding] autorelease] : nil;
+}
+
+static NSArray *ItemsFromJSON(NSString *json)
+{
+	if ( [json length] == 0 )
+		return nil;
+	id items = [NSJSONSerialization JSONObjectWithData:[json dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
+	return [items isKindOfClass:[NSArray class]] ? items : nil;
+}
+
 -(void) step:(sqlite3_stmt *)statement
 {
 	if ( sqlite3_step(statement) != SQLITE_DONE )
@@ -173,6 +201,8 @@ static NSString *columnString(sqlite3_stmt *statement, int column)
 	bindString(saveStatement, 6, [clipping appLocalizedName]);
 	bindString(saveStatement, 7, [clipping appBundleURL]);
 	sqlite3_bind_int64(saveStatement, 8, [clipping timestamp]);
+	bindString(saveStatement, 9, ItemsJSON([clipping items]));
+	sqlite3_bind_int(saveStatement, 10, [clipping contentsDescribeItems] ? 1 : 0);
 	[self step:saveStatement];
 }
 
@@ -186,7 +216,7 @@ static NSString *columnString(sqlite3_stmt *statement, int column)
 {
 	NSMutableArray *clippings = [NSMutableArray array];
 	sqlite3_stmt *statement = NULL;
-	if ( ![self prepare:"SELECT id, rank, contents, type, app_name, app_bundle_path, timestamp FROM clips WHERE list = ? ORDER BY rank DESC" into:&statement] )
+	if ( ![self prepare:"SELECT id, rank, contents, type, app_name, app_bundle_path, timestamp, items, described FROM clips WHERE list = ? ORDER BY rank DESC" into:&statement] )
 		return clippings;
 
 	sqlite3_bind_int(statement, 1, list);
@@ -199,6 +229,8 @@ static NSString *columnString(sqlite3_stmt *statement, int column)
 															  withTimestamp:(NSInteger)sqlite3_column_int64(statement, 6)];
 		[clipping setClipId:columnString(statement, 0)];
 		[clipping setRank:sqlite3_column_double(statement, 1)];
+		[clipping setItems:ItemsFromJSON(columnString(statement, 7))];
+		[clipping setContentsDescribeItems:sqlite3_column_int(statement, 8) != 0];
 		[clippings addObject:clipping];
 		[clipping release];
 	}

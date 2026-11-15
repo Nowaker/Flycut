@@ -7,6 +7,8 @@
 //
 
 #import "FlycutServerMirror.h"
+#import "FlycutFolderSync.h"
+#import "FlycutBlobStore.h"
 #import <Security/Security.h>
 #include <sys/stat.h>
 #include <netdb.h>
@@ -338,6 +340,8 @@ static BOOL HostIsLoopbackOrTailnet(NSString *host)
 		NSData *appended = [data subdataWithRange:NSMakeRange((NSUInteger)overlap, [data length] - (NSUInteger)overlap)];
 		if ( [appended length] == 0 )
 			return NO;
+		if ( ![self downloadBlobsOf:machine referencedBy:appended error:errorOut] )
+			return NO;
 		if ( !AppendToFile(path, appended) )
 			*errorOut = [NSString stringWithFormat:@"cannot write %@", path];
 		return YES;
@@ -347,9 +351,103 @@ static BOOL HostIsLoopbackOrTailnet(NSString *host)
 		if ( *errorOut || [response statusCode] != 200 || !data || LogSize(response) != (long long)[data length] )
 			return NO;
 	}
+	if ( ![self downloadBlobsOf:machine referencedBy:data error:errorOut] )
+		return NO;
 	if ( !ReplaceFile(path, data) )
 		*errorOut = [NSString stringWithFormat:@"cannot write %@", path];
 	return YES;
+}
+
+#pragma mark Blobs
+
+-(FlycutBlobStore *) blobsOfMachine:(NSString *)machine
+{
+	return [[[FlycutBlobStore alloc] initWithDirectory:[FlycutFolderSync blobDirectoryForMachine:machine inFolder:localFolder]] autorelease];
+}
+
+-(NSString *) blobPathOf:(NSString *)machine address:(NSString *)address
+{
+	return [NSString stringWithFormat:@"/v1/blobs/%@/%@", machine, address];
+}
+
+// Fetches the blobs the lines refer to that aren't here yet, before the lines are written, so FolderSync finds
+// a line's data when it reads the line. A blob the server doesn't have is skipped: blobs are uploaded before
+// their lines, so it is gone for good. Any other failure leaves the lines for the next round.
+-(BOOL) downloadBlobsOf:(NSString *)machine referencedBy:(NSData *)lines error:(NSString **)errorOut
+{
+	FlycutBlobStore *blobs = nil;
+	for ( NSString *address in [FlycutFolderSync blobAddressesInLog:lines] ) {
+		blobs = blobs ?: [self blobsOfMachine:machine];
+		if ( [blobs hasAddress:address] )
+			continue;
+		NSHTTPURLResponse *response = nil;
+		NSData *data = [self request:@"GET" path:[self blobPathOf:machine address:address] query:nil body:nil headers:nil response:&response error:errorOut];
+		if ( *errorOut )
+			return NO;
+		if ( [response statusCode] == 404 )
+			continue;
+		if ( [response statusCode] != 200 || !data || ![[FlycutBlobStore addressOfData:data] isEqualToString:address] ) {
+			*errorOut = [NSString stringWithFormat:@"cannot download %@'s pasteboard data (HTTP %ld)", machine, (long)[response statusCode]];
+			return NO;
+		}
+		if ( ![blobs storeData:data] ) {
+			*errorOut = [NSString stringWithFormat:@"cannot write %@", [blobs directory]];
+			return NO;
+		}
+	}
+	return YES;
+}
+
+// Sends this machine's blobs the lines refer to and the server lacks; known lists what it has, or nil to ask.
+-(BOOL) uploadBlobsReferencedBy:(NSData *)lines serverHas:(NSSet *)known error:(NSString **)errorOut
+{
+	NSSet *addresses = [FlycutFolderSync blobAddressesInLog:lines];
+	if ( [addresses count] == 0 )
+		return YES;
+	FlycutBlobStore *blobs = [self blobsOfMachine:machineId];
+	for ( NSString *address in addresses ) {
+		if ( [known containsObject:address] )
+			continue;
+		NSString *path = [self blobPathOf:machineId address:address];
+		NSHTTPURLResponse *response = nil;
+		if ( !known ) {
+			[self request:@"HEAD" path:path query:nil body:nil headers:nil response:&response error:errorOut];
+			if ( *errorOut )
+				return NO;
+			if ( [response statusCode] == 200 )
+				continue;
+		}
+		NSData *data = [blobs dataAtAddress:address];
+		if ( !data )
+			continue;	// gone locally too; readers skip it
+		[self request:@"PUT" path:path query:nil body:data headers:nil response:&response error:errorOut];
+		if ( *errorOut )
+			return NO;
+		// Too large for the server or its proxy: left out rather than retried forever; readers skip it.
+		if ( [response statusCode] == 413 ) {
+			NSLog(@"Flycut sync: %@ refused %lu bytes of pasteboard data as too large; synced without it", [serverURL host], (unsigned long)[data length]);
+			continue;
+		}
+		if ( [response statusCode] != 204 ) {
+			*errorOut = [NSString stringWithFormat:@"cannot upload pasteboard data (HTTP %ld)", (long)[response statusCode]];
+			return NO;
+		}
+	}
+	return YES;
+}
+
+-(NSSet *) serverBlobsWithError:(NSString **)errorOut
+{
+	NSHTTPURLResponse *response = nil;
+	NSData *listing = [self request:@"GET" path:[@"/v1/blobs/" stringByAppendingString:machineId] query:nil body:nil headers:nil response:&response error:errorOut];
+	if ( *errorOut )
+		return nil;
+	NSArray *addresses = listing ? [NSJSONSerialization JSONObjectWithData:listing options:0 error:nil] : nil;
+	if ( [response statusCode] != 200 || ![addresses isKindOfClass:[NSArray class]] ) {
+		*errorOut = [NSString stringWithFormat:@"cannot list this machine's pasteboard data on the server (HTTP %ld)", (long)[response statusCode]];
+		return nil;
+	}
+	return [NSSet setWithArray:addresses];
 }
 
 -(NSString *) uploadStatePath
@@ -398,6 +496,8 @@ static NSString *HexString(NSData *data)
 	long long newServerSize = 0;
 	if ( localUnchangedSinceSent && serverAsSent ) {
 		NSData *appended = [local subdataWithRange:NSMakeRange((NSUInteger)sent, complete - (NSUInteger)sent)];
+		if ( ![self uploadBlobsReferencedBy:appended serverHas:nil error:errorOut] )
+			return;
 		[self request:@"POST" path:logPath query:nil body:appended
 			  headers:@{@"X-Log-Offset": [NSString stringWithFormat:@"%lld", serverSize]} response:&response error:errorOut];
 		if ( *errorOut )
@@ -405,6 +505,10 @@ static NSString *HexString(NSData *data)
 		newServerSize = LogSize(response);
 	}
 	if ( !(localUnchangedSinceSent && serverAsSent) || [response statusCode] == 409 ) {
+		NSData *whole = [local subdataWithRange:NSMakeRange(0, complete)];
+		NSSet *serverBlobs = [[FlycutFolderSync blobAddressesInLog:whole] count] ? [self serverBlobsWithError:errorOut] : [NSSet set];
+		if ( *errorOut || ![self uploadBlobsReferencedBy:whole serverHas:serverBlobs error:errorOut] )
+			return;
 		[self request:@"PUT" path:logPath query:nil body:[local subdataWithRange:NSMakeRange(0, complete)] headers:nil response:&response error:errorOut];
 		if ( *errorOut )
 			return;

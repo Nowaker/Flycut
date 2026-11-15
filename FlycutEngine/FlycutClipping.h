@@ -41,7 +41,22 @@ typedef NS_ENUM(int, FlycutCredentialState) {
     double clipRank;
 // Whether the contents look like a credential, worked out on first use (FlycutCredentialDetector)
     FlycutCredentialState credentialState;
+    NSArray * clipItems;
+    BOOL clipContentsDescribeItems;
 }
+
+// The pasteboard items the clipping was copied with, each an array of representations
+// {"t": pasteboard type, "b": FlycutBlobStore address, "n": byte count}. nil when the copy was
+// plain text only, so the contents are all there is.
+@property (nonatomic, copy) NSArray *items;
+// The contents describe the items ("[image: PNG, 1920×1080, 1.2 MB]") because they have no text.
+@property (nonatomic, assign) BOOL contentsDescribeItems;
+
+// Identifies the items' data: equal for two copies of the same data, empty without items.
+-(NSString *) itemsFingerprint;
+// What duplicate removal compares: the text, or for a described clipping, its data.
+-(NSString *) dedupeKey;
+-(NSArray *) blobAddresses;
 
 -(id) initWithContents:(NSString *)contents withType:(NSString *)type withDisplayLength:(int)displayLength withAppLocalizedName:(NSString *)localizedName withAppBundleURL:(NSString *)bundleURL withTimestamp:(NSInteger)timestamp;
 /* -(id) initWithCoder:(NSCoder *)coder;

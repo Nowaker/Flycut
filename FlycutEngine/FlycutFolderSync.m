@@ -13,6 +13,15 @@
 
 static NSString *const kLogExtension = @"jsonl";
 static const NSUInteger kTailLength = 32;
+// How long a line whose data hasn't arrived yet (the folder tool copies files in any order) is waited for.
+static const int64_t kMissingBlobWaitMilliseconds = 10 * 60 * 1000;
+static const NSTimeInterval kUnreferencedBlobAge = 600;
+
+typedef NS_ENUM(int, FlycutEventOutcome) {
+	FlycutEventIgnored = 0,
+	FlycutEventApplied,
+	FlycutEventWaiting,	// refers to data that isn't in the folder yet; read again from this line next time
+};
 
 static int64_t NowMilliseconds(void)
 {
@@ -47,7 +56,43 @@ static NSString *HexString(NSData *data)
 	NSMutableDictionary *pendingChanges[2];	// per list: clip id -> clipping to place, or NSNull to remove
 }
 
-@synthesize folder, machineId, lastError, pollInterval, compactionThreshold, didApplyRemoteChanges, crypto, credentialDetector;
+@synthesize folder, machineId, lastError, pollInterval, compactionThreshold, didApplyRemoteChanges, crypto, credentialDetector, blobStore;
+
++(NSString *) blobDirectoryForMachine:(NSString *)machine inFolder:(NSString *)aFolder
+{
+	return [[aFolder stringByAppendingPathComponent:@"blobs"] stringByAppendingPathComponent:machine];
+}
+
++(NSSet *) blobAddressesInLog:(NSData *)log
+{
+	NSMutableSet *addresses = [NSMutableSet set];
+	const char *bytes = [log bytes];
+	NSUInteger lineStart = 0, length = [log length];
+	for ( NSUInteger i = 0; i < length; i++ ) {
+		if ( bytes[i] != '\n' )
+			continue;
+		// Only lines with items are parsed; most are text clippings.
+		NSData *line = [NSData dataWithBytesNoCopy:(void *)(bytes + lineStart) length:i - lineStart freeWhenDone:NO];
+		lineStart = i + 1;
+		if ( [line rangeOfData:[@"\"items\"" dataUsingEncoding:NSUTF8StringEncoding] options:0 range:NSMakeRange(0, [line length])].location == NSNotFound )
+			continue;
+		NSDictionary *event = [NSJSONSerialization JSONObjectWithData:line options:0 error:nil];
+		NSArray *items = [event isKindOfClass:[NSDictionary class]] ? [event objectForKey:@"items"] : nil;
+		if ( ![items isKindOfClass:[NSArray class]] )
+			continue;
+		for ( NSArray *item in items )
+			if ( [item isKindOfClass:[NSArray class]] )
+				for ( NSDictionary *representation in item )
+					if ( [representation isKindOfClass:[NSDictionary class]] && [FlycutBlobStore isAddress:[representation objectForKey:@"b"]] )
+						[addresses addObject:[representation objectForKey:@"b"]];
+	}
+	return addresses;
+}
+
+-(FlycutBlobStore *) blobsOfMachine:(NSString *)machine
+{
+	return [[[FlycutBlobStore alloc] initWithDirectory:[FlycutFolderSync blobDirectoryForMachine:machine inFolder:folder]] autorelease];
+}
 
 -(instancetype) initWithFolder:(NSString *)aFolder
 					 historyDB:(FlycutHistoryDB *)aHistoryDB
@@ -131,6 +176,7 @@ static NSString *HexString(NSData *data)
 	else {
 		[self sealCredentialsInOwnLogIfNeeded];
 		[self compactOwnLogIfNeeded];
+		[self removeUnreferencedOwnBlobs];
 	}
 
 	[pollTimer invalidate];
@@ -198,6 +244,11 @@ static NSString *HexString(NSData *data)
 	NSMutableDictionary *event = [NSMutableDictionary dictionaryWithDictionary:@{
 		@"v": @1, @"op": @"put", @"list": @(list), @"id": [clipping clipId], @"at": @(at), @"m": machineId,
 		@"rank": @([clipping rank]), @"contents": [clipping contents] ?: @"", @"ts": @([clipping timestamp])}];
+	if ( [clipping contentsDescribeItems] )
+		[event setObject:@YES forKey:@"described"];
+	NSArray *items = [self eventItemsForClipping:clipping sealed:[self eventNeedsSealing:event]];
+	if ( [items count] )
+		[event setObject:items forKey:@"items"];
 	[self sealContentsOfEvent:event];
 	if ( [clipping type] )
 		[event setObject:[clipping type] forKey:@"type"];
@@ -208,17 +259,78 @@ static NSString *HexString(NSData *data)
 	return event;
 }
 
-// Replaces a credential's "contents" with its sealed form "enc". Returns whether it did.
--(BOOL) sealContentsOfEvent:(NSMutableDictionary *)event
+-(BOOL) eventNeedsSealing:(NSDictionary *)event
 {
 	NSString *contents = [event objectForKey:@"contents"];
-	if ( !crypto || ![contents isKindOfClass:[NSString class]] || ![credentialDetector isCredential:contents] )
+	return crypto && ![[event objectForKey:@"described"] boolValue]
+		&& [contents isKindOfClass:[NSString class]] && [credentialDetector isCredential:contents];
+}
+
+// Puts the items' data in this machine's blob directory, sealed or as hard links to the blob store.
+// Data no longer in the blob store is left out.
+-(NSArray *) eventItemsForClipping:(FlycutClipping *)clipping sealed:(BOOL)sealed
+{
+	if ( !blobStore || [[clipping items] count] == 0 )
+		return nil;
+	FlycutBlobStore *ownBlobs = [self blobsOfMachine:machineId];
+	NSMutableArray *eventItems = [NSMutableArray arrayWithCapacity:[[clipping items] count]];
+	for ( NSArray *item in [clipping items] ) {
+		NSMutableArray *eventItem = [NSMutableArray arrayWithCapacity:[item count]];
+		for ( NSDictionary *representation in item ) {
+			NSString *address = [representation objectForKey:@"b"];
+			NSMutableDictionary *eventRepresentation = [NSMutableDictionary dictionaryWithDictionary:representation];
+			if ( sealed ) {
+				NSData *data = [blobStore dataAtAddress:address];
+				NSString *sealedAddress = data ? [ownBlobs storeData:[crypto sealData:data]] : nil;
+				if ( !sealedAddress )
+					continue;
+				[eventRepresentation setObject:sealedAddress forKey:@"b"];
+				[eventRepresentation setObject:@YES forKey:@"s"];
+			} else if ( ![blobStore exportAddress:address toPath:[ownBlobs pathForAddress:address]] )
+				continue;
+			[eventItem addObject:eventRepresentation];
+		}
+		if ( [eventItem count] )
+			[eventItems addObject:eventItem];
+	}
+	return eventItems;
+}
+
+// Replaces a credential's "contents" with its sealed form "enc", and its items' data with sealed data,
+// read from this machine's blob directory. Returns whether it did.
+-(BOOL) sealContentsOfEvent:(NSMutableDictionary *)event
+{
+	if ( ![self eventNeedsSealing:event] )
 		return NO;
-	NSString *sealed = [crypto seal:contents];
+	NSString *sealed = [crypto seal:[event objectForKey:@"contents"]];
 	if ( !sealed )
 		return NO;
 	[event setObject:sealed forKey:@"enc"];
 	[event removeObjectForKey:@"contents"];
+
+	FlycutBlobStore *ownBlobs = [self blobsOfMachine:machineId];
+	NSMutableArray *sealedItems = [NSMutableArray array];
+	for ( NSArray *item in [event objectForKey:@"items"] ) {
+		NSMutableArray *sealedItem = [NSMutableArray array];
+		for ( NSDictionary *representation in item ) {
+			if ( [[representation objectForKey:@"s"] boolValue] ) {
+				[sealedItem addObject:representation];
+				continue;
+			}
+			NSData *data = [ownBlobs dataAtAddress:[representation objectForKey:@"b"]];
+			NSString *sealedAddress = data ? [ownBlobs storeData:[crypto sealData:data]] : nil;
+			if ( !sealedAddress )
+				continue;
+			NSMutableDictionary *sealedRepresentation = [[representation mutableCopy] autorelease];
+			[sealedRepresentation setObject:sealedAddress forKey:@"b"];
+			[sealedRepresentation setObject:@YES forKey:@"s"];
+			[sealedItem addObject:sealedRepresentation];
+		}
+		if ( [sealedItem count] )
+			[sealedItems addObject:sealedItem];
+	}
+	if ( [event objectForKey:@"items"] )
+		[event setObject:sealedItems forKey:@"items"];
 	return YES;
 }
 
@@ -335,10 +447,10 @@ static NSString *HexString(NSData *data)
 	return names;
 }
 
-// Reads the complete lines appended since the last read. A file that no longer has the bytes the last
-// read ended with was rewritten (compacted, or replaced by the sync tool), so it is read from the start;
-// applying an event twice changes nothing.
--(NSArray *) newEventsInFile:(NSString *)name nextPosition:(NSString **)nextPosition
+// Reads the complete lines appended since the last read, each as {"event", "position"}: the read position
+// just past its line. A file that no longer has the bytes the last read ended with was rewritten (compacted,
+// or replaced by the sync tool), so it is read from the start; applying an event twice changes nothing.
+-(NSArray *) newEventsInFile:(NSString *)name
 {
 	NSString *path = [folder stringByAppendingPathComponent:name];
 	NSFileHandle *file = [NSFileHandle fileHandleForReadingAtPath:path];
@@ -373,20 +485,32 @@ static NSString *HexString(NSData *data)
 	for ( NSUInteger i = 0; i < end; i++ ) {
 		if ( bytes[i] != '\n' )
 			continue;
+		id event = nil;
 		if ( i > lineStart ) {
 			NSData *line = [NSData dataWithBytesNoCopy:(void *)(bytes + lineStart) length:i - lineStart freeWhenDone:NO];
-			id event = [NSJSONSerialization JSONObjectWithData:line options:0 error:nil];
-			if ( [event isKindOfClass:[NSDictionary class]] && [[event objectForKey:@"v"] intValue] == 1 )
-				[events addObject:event];
-			else
+			event = [NSJSONSerialization JSONObjectWithData:line options:0 error:nil];
+			if ( !([event isKindOfClass:[NSDictionary class]] && [[event objectForKey:@"v"] intValue] == 1) ) {
 				NSLog(@"Flycut sync: skipping an unreadable line in %@ at byte %llu", name, offset + lineStart);
+				event = nil;
+			}
 		}
-		lineStart = i + 1;
+		NSUInteger lineEnd = i + 1;
+		lineStart = lineEnd;
+		// The last line always gets a position, so the read moves past trailing unreadable lines too.
+		if ( !event && lineEnd < end )
+			continue;
+		NSUInteger tailLength = MIN((NSUInteger)kTailLength, (NSUInteger)(offset + lineEnd));
+		NSData *tail = lineEnd >= tailLength ? [data subdataWithRange:NSMakeRange(lineEnd - tailLength, tailLength)] : nil;
+		if ( !tail ) {
+			// The tail reaches back before this read's start; take it from the file.
+			NSFileHandle *again = [NSFileHandle fileHandleForReadingAtPath:path];
+			[again seekToFileOffset:offset + lineEnd - tailLength];
+			tail = [again readDataOfLength:tailLength];
+			[again closeFile];
+		}
+		[events addObject:@{@"event": event ?: [NSNull null],
+							@"position": [NSString stringWithFormat:@"%llu %@", offset + lineEnd, HexString(tail)]}];
 	}
-
-	NSUInteger tailLength = MIN(kTailLength, end);
-	*nextPosition = [NSString stringWithFormat:@"%llu %@", offset + end,
-					 HexString([data subdataWithRange:NSMakeRange(end - tailLength, tailLength)])];
 	return events;
 }
 
@@ -395,57 +519,68 @@ static NSString *HexString(NSData *data)
 	BOOL changed = NO;
 	for ( NSString *name in [self otherLogNames] ) {
 		[otherMachines addObject:[name stringByDeletingPathExtension]];
-		NSString *nextPosition = nil;
-		NSArray *events = [self newEventsInFile:name nextPosition:&nextPosition];
-		if ( !nextPosition )
+		NSArray *events = [self newEventsInFile:name];
+		if ( [events count] == 0 )
 			continue;
 
+		NSString *nextPosition = nil;
 		[historyDB beginTransaction];
 		applyingRemoteChanges = YES;
-		for ( NSDictionary *event in events )
-			changed |= [self applyEvent:event];
+		for ( NSDictionary *entry in events ) {
+			NSDictionary *event = [entry objectForKey:@"event"];
+			FlycutEventOutcome outcome = event == (id)[NSNull null] ? FlycutEventIgnored : [self applyEvent:event];
+			if ( outcome == FlycutEventWaiting )
+				break;
+			changed |= outcome == FlycutEventApplied;
+			nextPosition = [entry objectForKey:@"position"];
+		}
 		[self applyPendingChanges];
 		applyingRemoteChanges = NO;
-		[historyDB setMetaValue:nextPosition forKey:[self readPositionKeyForFile:name]];
+		if ( nextPosition )
+			[historyDB setMetaValue:nextPosition forKey:[self readPositionKeyForFile:name]];
 		[historyDB commitTransaction];
 	}
 	if ( changed && didApplyRemoteChanges )
 		didApplyRemoteChanges();
 }
 
--(BOOL) applyEvent:(NSDictionary *)event
+-(FlycutEventOutcome) applyEvent:(NSDictionary *)event
 {
 	NSString *op = [event objectForKey:@"op"];
 	int listNumber = [[event objectForKey:@"list"] intValue];
 	if ( listNumber != FlycutHistoryListClippings && listNumber != FlycutHistoryListFavorites )
-		return NO;
+		return FlycutEventIgnored;
 	FlycutHistoryList list = (FlycutHistoryList)listNumber;
 	int64_t at = [[event objectForKey:@"at"] longLongValue];
 	NSString *machine = [event objectForKey:@"m"];
-	if ( ![machine isKindOfClass:[NSString class]] || [machine isEqualToString:machineId] )
-		return NO;
+	if ( ![machine isKindOfClass:[NSString class]] || [machine isEqualToString:machineId] || [machine containsString:@"/"] || [machine hasPrefix:@"."] )
+		return FlycutEventIgnored;
 
 	if ( [op isEqualToString:@"clear"] ) {
 		[self applyPendingChanges];
-		return [self applyClearOfList:list at:at by:machine];
+		return [self applyClearOfList:list at:at by:machine] ? FlycutEventApplied : FlycutEventIgnored;
 	}
 
 	NSString *clipId = [event objectForKey:@"id"];
 	if ( ![clipId isKindOfClass:[NSString class]] || [clipId length] == 0 )
-		return NO;
+		return FlycutEventIgnored;
 	FlycutSyncState cleared = [self clearMarkerForList:list];
 	if ( !ChangeIsNewer(at, machine, cleared.at, cleared.machine) )
-		return NO;
+		return FlycutEventIgnored;
 	FlycutSyncState state = [historyDB syncStateForClipId:clipId inList:list];
 	if ( state.at != 0 && !ChangeIsNewer(at, machine, state.at, state.machine) )
-		return NO;
+		return FlycutEventIgnored;
 
 	if ( [op isEqualToString:@"put"] ) {
 		NSString *contents = [event objectForKey:@"contents"];
 		if ( nil == contents && nil != [event objectForKey:@"enc"] )
 			contents = [crypto open:[event objectForKey:@"enc"]];
 		if ( ![contents isKindOfClass:[NSString class]] || [contents length] == 0 )
-			return NO;
+			return FlycutEventIgnored;
+		BOOL missingData = NO;
+		NSArray *items = [self clippingItemsOfEvent:event fromMachine:machine missingData:&missingData];
+		if ( missingData && NowMilliseconds() - at < kMissingBlobWaitMilliseconds )
+			return FlycutEventWaiting;
 		[historyDB setSyncState:(FlycutSyncState){ at, machine, NO } forClipId:clipId inList:list];
 		FlycutClipping *clipping = [[FlycutClipping alloc] initWithContents:contents
 																   withType:[self stringIn:event forKey:@"type"]
@@ -455,16 +590,58 @@ static NSString *HexString(NSData *data)
 															  withTimestamp:[[event objectForKey:@"ts"] integerValue]];
 		[clipping setClipId:clipId];
 		[clipping setRank:[[event objectForKey:@"rank"] doubleValue]];
+		[clipping setItems:items];
+		[clipping setContentsDescribeItems:[[event objectForKey:@"described"] boolValue]];
 		[pendingChanges[list] setObject:clipping forKey:clipId];
 		[clipping release];
-		return YES;
+		return FlycutEventApplied;
 	}
 	if ( [op isEqualToString:@"del"] ) {
 		[historyDB setSyncState:(FlycutSyncState){ at, machine, YES } forClipId:clipId inList:list];
 		[pendingChanges[list] setObject:[NSNull null] forKey:clipId];
-		return YES;
+		return FlycutEventApplied;
 	}
-	return NO;
+	return FlycutEventIgnored;
+}
+
+// Copies the items' data from the machine's blob directory into the blob store, opening sealed data.
+// Data that isn't there sets missingData and is left out, as is data that doesn't open or match its address.
+-(NSArray *) clippingItemsOfEvent:(NSDictionary *)event fromMachine:(NSString *)machine missingData:(BOOL *)missingData
+{
+	NSArray *eventItems = [event objectForKey:@"items"];
+	if ( !blobStore || ![eventItems isKindOfClass:[NSArray class]] || [eventItems count] == 0 )
+		return nil;
+	FlycutBlobStore *machineBlobs = [self blobsOfMachine:machine];
+	NSMutableArray *items = [NSMutableArray arrayWithCapacity:[eventItems count]];
+	for ( NSArray *eventItem in eventItems ) {
+		if ( ![eventItem isKindOfClass:[NSArray class]] )
+			continue;
+		NSMutableArray *item = [NSMutableArray arrayWithCapacity:[eventItem count]];
+		for ( NSDictionary *representation in eventItem ) {
+			NSString *type = [representation isKindOfClass:[NSDictionary class]] ? [representation objectForKey:@"t"] : nil;
+			NSString *address = [representation isKindOfClass:[NSDictionary class]] ? [representation objectForKey:@"b"] : nil;
+			if ( ![type isKindOfClass:[NSString class]] || ![FlycutBlobStore isAddress:address] )
+				continue;
+			NSData *data = [machineBlobs dataAtAddress:address];
+			if ( !data ) {
+				*missingData = YES;
+				NSString *placeholder = [[machineBlobs directory] stringByAppendingPathComponent:[NSString stringWithFormat:@".%@.icloud", address]];
+				if ( [[NSFileManager defaultManager] fileExistsAtPath:placeholder] )
+					[[NSFileManager defaultManager] startDownloadingUbiquitousItemAtURL:[NSURL fileURLWithPath:[machineBlobs pathForAddress:address]] error:nil];
+				continue;
+			}
+			if ( ![[FlycutBlobStore addressOfData:data] isEqualToString:address] )
+				continue;
+			if ( [[representation objectForKey:@"s"] boolValue] )
+				data = [crypto openData:data];
+			NSString *localAddress = data ? [blobStore storeData:data] : nil;
+			if ( localAddress )
+				[item addObject:@{@"t": type, @"b": localAddress, @"n": @([data length])}];
+		}
+		if ( [item count] )
+			[items addObject:item];
+	}
+	return [items count] ? items : nil;
 }
 
 // Stores take changes in batches: placing one clipping at a time costs a pass over the whole list each.
@@ -614,6 +791,16 @@ static NSString *HexString(NSData *data)
 	NSLog(@"Flycut sync: compacted %@ from %lu to %lu events", [self ownLogPath], (unsigned long)eventCount, (unsigned long)[latest count]);
 }
 
+-(void) removeUnreferencedOwnBlobs
+{
+	NSData *log = [NSData dataWithContentsOfFile:[self ownLogPath]];
+	if ( !log )
+		return;
+	NSUInteger removed = [[self blobsOfMachine:machineId] removeBlobsExcept:[FlycutFolderSync blobAddressesInLog:log] olderThan:kUnreferencedBlobAge];
+	if ( removed )
+		NSLog(@"Flycut sync: removed %lu blob(s) no line of %@ refers to", (unsigned long)removed, [self ownLogPath]);
+}
+
 -(void) dealloc
 {
 	[pollTimer invalidate];
@@ -628,6 +815,7 @@ static NSString *HexString(NSData *data)
 	[otherMachines release];
 	[crypto release];
 	[credentialDetector release];
+	[blobStore release];
 	[pendingChanges[FlycutHistoryListClippings] release];
 	[pendingChanges[FlycutHistoryListFavorites] release];
 	[super dealloc];

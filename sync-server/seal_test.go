@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"os"
 	"path/filepath"
@@ -45,6 +46,21 @@ func TestInterop(t *testing.T) {
 			t.Fatalf("%s: %v", name, err)
 		}
 		if got, err := s.open(strings.TrimSpace(string(raw))); err != nil || got != plaintext {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	// Blob sealing is deterministic, so every implementation must produce the same bytes.
+	blob := []byte(plaintext + "\x00\x01\xfe\xff")
+	os.WriteFile(filepath.Join(dir, "go.blob"), s.sealData(blob), 0o600)
+	for _, name := range []string{"objc.blob", "python.blob"} {
+		raw, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if !bytes.Equal(raw, s.sealData(blob)) {
+			t.Errorf("%s differs from Go's sealed blob", name)
+		}
+		if got, err := s.openData(raw); err != nil || !bytes.Equal(got, blob) {
 			t.Errorf("%s: %v", name, err)
 		}
 	}

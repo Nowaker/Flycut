@@ -21,6 +21,8 @@
 - (void)historyPanel:(HistoryPanel *)panel pasteClipping:(FlycutClipping *)clipping inFavorites:(BOOL)favorites;
 - (void)historyPanel:(HistoryPanel *)panel copyClipping:(FlycutClipping *)clipping inFavorites:(BOOL)favorites;
 - (void)historyPanel:(HistoryPanel *)panel deleteClipping:(FlycutClipping *)clipping inFavorites:(BOOL)favorites;
+@optional
+- (NSImage *)historyPanel:(HistoryPanel *)panel imageForClipping:(FlycutClipping *)clipping;
 @end
 
 @interface HistoryPanel : NSPanel <NSTableViewDataSource, NSTableViewDelegate, NSSearchFieldDelegate, NSWindowDelegate>

@@ -12,7 +12,8 @@
 // Every line is one JSON event:
 //
 //   {"v":1,"op":"put","list":0,"id":"<uuid>","at":<ms>,"m":"<machine>","rank":<n>,"contents":"...",
-//    "type":"...","app":"...","appPath":"...","ts":<seconds>}
+//    "type":"...","app":"...","appPath":"...","ts":<seconds>,
+//    "items":[[{"t":"<pasteboard type>","b":"<sha256>","n":<bytes>,"s":true}, ...], ...],"described":true}
 //   {"v":1,"op":"del","list":0,"id":"<uuid>","at":<ms>,"m":"<machine>"}
 //   {"v":1,"op":"clear","list":0,"at":<ms>,"m":"<machine>"}
 //
@@ -20,12 +21,18 @@
 // (at, m) wins, whichever file it is read from and in whatever order, so every machine ends up
 // with the same history. Removals by local retention (remember limit, age) are not shared:
 // a machine keeping less history doesn't shorten anyone else's.
+//
+// items (only when the copy had more than plain text) are its pasteboard items, each a list of
+// representations whose data is the file blobs/<machine>/<b>, named by the SHA-256 of its bytes and
+// written before the line that refers to it. "s" marks data sealed with the crypto; "described" says the
+// contents only describe the items. A machine removes its blobs once no line of its file refers to them.
 
 #import <Foundation/Foundation.h>
 #import "FlycutStore.h"
 #import "FlycutHistoryDB.h"
 #import "FlycutSyncCrypto.h"
 #import "FlycutCredentialDetector.h"
+#import "FlycutBlobStore.h"
 
 @interface FlycutFolderSync : NSObject <FlycutStorePersistence>
 
@@ -56,6 +63,13 @@
 // credentials it wrote before are sealed too.
 @property (nonatomic, retain) FlycutSyncCrypto *crypto;
 @property (nonatomic, retain) FlycutCredentialDetector *credentialDetector;	// default: the shared one
+// Where clippings' pasteboard data is kept on this machine; without one, only text is shared.
+@property (nonatomic, retain) FlycutBlobStore *blobStore;
+
+// The blob addresses lines of a log refer to, for removing blobs nothing refers to any more.
++(NSSet *) blobAddressesInLog:(NSData *)log;
+// A machine's blob directory in a sync folder.
++(NSString *) blobDirectoryForMachine:(NSString *)machine inFolder:(NSString *)folder;
 
 // Called on the main thread after changes from other machines were applied to the stores.
 @property (nonatomic, copy) void (^didApplyRemoteChanges)(void);

@@ -330,10 +330,23 @@ static NSString *FoldUndecomposableLetters(NSString *string)
 
 - (void)updatePreview
 {
-	NSString *contents = [[self selectedClipping] contents] ?: @"";
+	FlycutClipping *clipping = [self selectedClipping];
+	NSString *contents = [clipping contents] ?: @"";
 	if ( [contents length] > kPreviewLimit )
 		contents = [[contents substringToIndex:kPreviewLimit] stringByAppendingString:@"\n…"];
 	[preview setString:contents];
+
+	NSImage *image = nil;
+	if ( [clipping items] && [self.historyDelegate respondsToSelector:@selector(historyPanel:imageForClipping:)] )
+		image = [self.historyDelegate historyPanel:self imageForClipping:clipping];
+	if ( image && image.size.width > 0 && image.size.height > 0 ) {
+		CGFloat width = MIN(image.size.width, preview.textContainer.size.width - 2 * preview.textContainer.lineFragmentPadding);
+		NSTextAttachment *attachment = [[[NSTextAttachment alloc] init] autorelease];
+		attachment.image = image;
+		attachment.bounds = NSMakeRect(0, 0, width, width * image.size.height / image.size.width);
+		[[preview textStorage] appendAttributedString:[[[NSAttributedString alloc] initWithString:@"\n\n"] autorelease]];
+		[[preview textStorage] appendAttributedString:[NSAttributedString attributedStringWithAttachment:attachment]];
+	}
 	[preview scrollRangeToVisible:NSMakeRange(0, 0)];
 }
 
@@ -489,7 +502,8 @@ static NSString *FoldUndecomposableLetters(NSString *string)
 
 	FlycutClipping *clipping = [shownClippings objectAtIndex:row];
 	cell.textField.stringValue = [self titleForClipping:clipping];
-	cell.textField.textColor = [[FlycutCredentialDetector sharedDetector] isCredentialClipping:clipping] ? [NSColor systemRedColor] : [NSColor labelColor];
+	cell.textField.textColor = [[FlycutCredentialDetector sharedDetector] isCredentialClipping:clipping] ? [NSColor systemRedColor]
+		: [clipping contentsDescribeItems] ? [NSColor secondaryLabelColor] : [NSColor labelColor];
 	[(NSTextField *)[cell viewWithTag:2] setStringValue:[self subtitleForClipping:clipping]];
 	cell.imageView.image = [self iconForClipping:clipping];
 	return cell;

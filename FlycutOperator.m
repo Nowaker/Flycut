@@ -21,6 +21,7 @@
 #import "FlycutHistoryDB.h"
 #import "FlycutFolderSync.h"
 #import "FlycutServerMirror.h"
+#import "FlycutBlobStore.h"
 #endif
 
 @implementation FlycutOperator {
@@ -61,8 +62,10 @@
         @"pasteMovesToTop",
         [NSNumber numberWithBool:NO],
         @"syncSettingsViaICloud",
-        [NSNumber numberWithBool:NO],
+		[NSNumber numberWithBool:NO],
         @"syncClippingsViaICloud",
+		[NSNumber numberWithInt:64],
+		@"clippingSizeLimitMB",
         nil]];
 
 	settingsSyncList = @[@"rememberNum",
@@ -98,6 +101,9 @@
 	[self registerOrDeregisterICloudSync];
 
 	[self pruneExpiredClippings];
+#ifdef FLYCUT_MAC
+	[self removeUnusedBlobs];
+#endif
 	expiryTimer = [[NSTimer scheduledTimerWithTimeInterval:3600
 													 target:self
 												   selector:@selector(expiryTimerFired:)
@@ -108,7 +114,30 @@
 -(void) expiryTimerFired:(NSTimer *)timer
 {
 	[self pruneExpiredClippings];
+#ifdef FLYCUT_MAC
+	[self removeUnusedBlobs];
+#endif
 }
+
+#ifdef FLYCUT_MAC
+-(FlycutBlobStore *) blobStore
+{
+	return blobStore;
+}
+
+// Data a clipping on its way into a list was just stored for is younger than the grace period.
+-(void) removeUnusedBlobs
+{
+	NSMutableSet *used = [NSMutableSet set];
+	for ( FlycutStore *store in @[clippingStore ?: [NSNull null], favoritesStore ?: [NSNull null], stashedStore ?: [NSNull null]] )
+		if ( store != (id)[NSNull null] )
+			for ( FlycutClipping *clipping in [store allClippings] )
+				[used addObjectsFromArray:[clipping blobAddresses]];
+	NSUInteger removed = [blobStore removeBlobsExcept:used olderThan:600];
+	if ( removed )
+		NSLog(@"Flycut: removed %lu pasteboard data file(s) no clipping uses", (unsigned long)removed);
+}
+#endif
 
 -(FlycutStore*) primaryStore
 {
@@ -181,6 +210,7 @@
 	[self initializeStores];
 
 #ifdef FLYCUT_MAC
+	blobStore = [[FlycutBlobStore alloc] initWithDirectory:[[[FlycutHistoryDB defaultPath] stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"Blobs"]];
 	historyDB = [[FlycutHistoryDB alloc] initWithPath:[FlycutHistoryDB defaultPath]];
 	if ( historyDB ) {
 		if ( [[NSUserDefaults standardUserDefaults] integerForKey:@"savePreference"] >= 1 ) {
@@ -275,6 +305,7 @@
 		[[NSFileManager defaultManager] createDirectoryAtPath:folder withIntermediateDirectories:YES attributes:@{NSFilePosixPermissions: @0700} error:nil];
 	FlycutFolderSync *sync = [[FlycutFolderSync alloc] initWithFolder:folder historyDB:historyDB clippingStore:clippingStore favoritesStore:favoritesStore];
 	folderSync = sync;
+	[folderSync setBlobStore:blobStore];
 	[folderSync setDidApplyRemoteChanges:^{
 		[self adjustStackPositionIfOutOfBounds];
 	}];
@@ -682,7 +713,21 @@
 }
 
 - (NSString*)getPasteFromIndex:(int) position {
-	NSString *clipping = [self getClipFromCount:position];
+	FlycutClipping *clipping = [self clippingForPasteFromIndex:position];
+	return clipping ? [clipping contents] : nil;
+}
+
+- (FlycutClipping*)clippingForPasteFromStackPosition
+{
+	if ( [clippingStore jcListCount] > stackPosition )
+		return [self clippingForPasteFromIndex:stackPosition];
+	return nil;
+}
+
+- (FlycutClipping*)clippingForPasteFromIndex:(int) position {
+	if ( nil == [self getClipFromCount:position] )
+		return nil;
+	FlycutClipping *clipping = [[[clippingStore clippingAtPosition:position] retain] autorelease];
 
 	if ( [[NSUserDefaults standardUserDefaults] boolForKey:@"pasteMovesToTop"] ) {
 		[clippingStore clippingMoveToTop:position];
@@ -848,22 +893,32 @@
 
 -(bool)addClipping:(NSString*)contents ofType:(NSString*)type fromApp:(NSString *)appName withAppBundleURL:(NSString *)bundleURL target:(id)selectorTarget clippingAddedSelector:(SEL)clippingAddedSelector
 {
-	if ( [clippingStore jcListCount] == 0 || ! [contents isEqualToString:[clippingStore clippingContentsAtPosition:0]]) {
-		bool success = [clippingStore addClipping:contents
-										   ofType:type
-							 fromAppLocalizedName:appName
-								 fromAppBundleURL:bundleURL
-									  atTimestamp:[[NSDate date] timeIntervalSince1970]];
+	return [self addClipping:contents ofType:type items:nil contentsDescribeItems:NO fromApp:appName withAppBundleURL:bundleURL target:selectorTarget clippingAddedSelector:clippingAddedSelector];
+}
 
+-(bool)addClipping:(NSString*)contents ofType:(NSString*)type items:(NSArray *)items contentsDescribeItems:(BOOL)described fromApp:(NSString *)appName withAppBundleURL:(NSString *)bundleURL target:(id)selectorTarget clippingAddedSelector:(SEL)clippingAddedSelector
+{
+	if ( [contents length] == 0 )
+		return NO;
+	FlycutClipping *clipping = [[[FlycutClipping alloc] initWithContents:contents
+																withType:type
+													   withDisplayLength:[clippingStore displayLen]
+													withAppLocalizedName:appName
+														withAppBundleURL:bundleURL
+														   withTimestamp:[[NSDate date] timeIntervalSince1970]] autorelease];
+	[clipping setItems:items];
+	[clipping setContentsDescribeItems:described];
+	FlycutClipping *top = [clippingStore jcListCount] > 0 ? [clippingStore clippingAtPosition:0] : nil;
+	if ( top && [top isEqual:clipping] && [[top itemsFingerprint] isEqualToString:[clipping itemsFingerprint]] )
+		return NO;
+
+	[clippingStore addClipping:clipping];
 //		The below tracks our position down down down... Maybe as an option?
 //		if ( [clippingStore jcListCount] > 1 ) stackPosition++;
-		stackPosition = 0;
-        [selectorTarget performSelector:clippingAddedSelector];
-		[self actionAfterListModification];
-
-		return success;
-    }
-	return  NO;
+	stackPosition = 0;
+	[selectorTarget performSelector:clippingAddedSelector];
+	[self actionAfterListModification];
+	return YES;
 }
 
 - (void)willDeleteClippingFromStore:(id)store AtIndex:(int)index {

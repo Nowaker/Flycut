@@ -20,6 +20,7 @@
 @class FlycutHistoryDB;
 @class FlycutFolderSync;
 @class FlycutServerMirror;
+@class FlycutBlobStore;
 
 @protocol FlycutOperatorDelegate <NSObject>
 @optional
@@ -39,6 +40,7 @@
 	FlycutFolderSync		*folderSync;
 	NSString				*folderSyncError;
 	FlycutServerMirror		*serverMirror;
+	FlycutBlobStore			*blobStore;
 	NSTimer					*expiryTimer;
 
 	SEL saveSelector;
@@ -60,9 +62,17 @@
 // Basic functionality
 -(int)indexOfClipping:(NSString*)contents ofType:(NSString*)type fromApp:(NSString *)appName withAppBundleURL:(NSString *)bundleURL;
 -(bool)addClipping:(NSString*)contents ofType:(NSString*)type fromApp:(NSString *)appName withAppBundleURL:(NSString *)bundleURL target:(id)selectorTarget clippingAddedSelector:(SEL)clippingAddedSelectorclippingAddedSelector;
+// Items as in FlycutClipping -items. A copy is new unless the top clipping has the same contents and items.
+-(bool)addClipping:(NSString*)contents ofType:(NSString*)type items:(NSArray *)items contentsDescribeItems:(BOOL)described fromApp:(NSString *)appName withAppBundleURL:(NSString *)bundleURL target:(id)selectorTarget clippingAddedSelector:(SEL)clippingAddedSelector;
 -(int)stackPosition;
 -(NSString*)getPasteFromStackPosition;
 -(NSString*)getPasteFromIndex:(int) position;
+-(FlycutClipping*)clippingForPasteFromStackPosition;
+-(FlycutClipping*)clippingForPasteFromIndex:(int) position;
+#ifdef FLYCUT_MAC
+-(FlycutBlobStore *)blobStore;
+-(void)removeUnusedBlobs;
+#endif
 -(bool) saveFromStack;
 -(bool)clearItemAtStackPosition;
 -(void)clearList;

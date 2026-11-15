@@ -7,8 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		09A5D9566A65FD0F5881DE35 /* FlycutBlobStore.m in Sources */ = {isa = PBXBuildFile; fileRef = 9638F553A86B2BFF58DF5AB7 /* FlycutBlobStore.m */; };
 		20BEC7D1F6FDC10574194F0E /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BE2FEBF70C6282593548D7A6 /* Security.framework */; };
 		2AC9C28FAF6FFB3578B94A85 /* FlycutFolderSync.m in Sources */ = {isa = PBXBuildFile; fileRef = C420A393102DFDD86BD28D29 /* FlycutFolderSync.m */; };
+		324B5E00D7C2214DF549447A /* FlycutPasteboard.m in Sources */ = {isa = PBXBuildFile; fileRef = A5155217B7EE216430728980 /* FlycutPasteboard.m */; };
 		3E5E37CA7E7275E2B171C3F1 /* FlycutServerMirror.m in Sources */ = {isa = PBXBuildFile; fileRef = 1893F45AD499281DFE449452 /* FlycutServerMirror.m */; };
 		41FADE9AD3858E81FDB5AC19 /* HistoryPanel.m in Sources */ = {isa = PBXBuildFile; fileRef = 6D68A2B7FD2C87403827C66A /* HistoryPanel.m */; };
 		660390D13DB7AC61347A5FB8 /* FlycutHistoryDB.m in Sources */ = {isa = PBXBuildFile; fileRef = 2526B83564A62BCA982378A7 /* FlycutHistoryDB.m */; };
@@ -346,17 +348,21 @@
 		8DC9C99B1F742115003BE8B5 /* CloudKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CloudKit.framework; path = System/Library/Frameworks/CloudKit.framework; sourceTree = SDKROOT; };
 		8DF82B332098F9CA00E2A1B9 /* MJCloudKitUserDefaultsSync.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = MJCloudKitUserDefaultsSync.xcodeproj; path = MJCloudKitUserDefaultsSync/MJCloudKitUserDefaultsSync.xcodeproj; sourceTree = "<group>"; };
 		8F4E5CDEB6B25038AB2571C1 /* FlycutSyncCrypto.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = FlycutSyncCrypto.m; path = FlycutEngine/FlycutSyncCrypto.m; sourceTree = SOURCE_ROOT; };
+		9638F553A86B2BFF58DF5AB7 /* FlycutBlobStore.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = FlycutBlobStore.m; path = FlycutEngine/FlycutBlobStore.m; sourceTree = SOURCE_ROOT; };
 		9FDACE7308DA611506F28EA0 /* credential-rules.json */ = {isa = PBXFileReference; includeInIndex = 1; name = "credential-rules.json"; path = "FlycutEngine/credential-rules.json"; sourceTree = SOURCE_ROOT; };
+		A5155217B7EE216430728980 /* FlycutPasteboard.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlycutPasteboard.m; sourceTree = "<group>"; };
 		AABE497A09FF9CD000A6A239 /* AppController.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = AppController.h; sourceTree = "<group>"; };
 		AABE497B09FF9CD000A6A239 /* AppController.m */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.objc; path = AppController.m; sourceTree = "<group>"; };
 		AAFAC84A0A1BD9DD00DC6025 /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = /System/Library/Frameworks/Carbon.framework; sourceTree = "<absolute>"; };
 		B337B36A7FEED20736B49677 /* FlycutSyncCrypto.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; name = FlycutSyncCrypto.h; path = FlycutEngine/FlycutSyncCrypto.h; sourceTree = SOURCE_ROOT; };
 		B55BAB2287FF8A7126E8C5D7 /* FlycutCredentialDetector.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = FlycutCredentialDetector.m; path = FlycutEngine/FlycutCredentialDetector.m; sourceTree = SOURCE_ROOT; };
 		B7EC641D842040F1054FC37C /* FlycutCredentialDetector.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; name = FlycutCredentialDetector.h; path = FlycutEngine/FlycutCredentialDetector.h; sourceTree = SOURCE_ROOT; };
+		B83669DD8AAF0D589383A403 /* FlycutPasteboard.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = FlycutPasteboard.h; sourceTree = "<group>"; };
 		BE2FEBF70C6282593548D7A6 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		C420A393102DFDD86BD28D29 /* FlycutFolderSync.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = FlycutFolderSync.m; path = FlycutEngine/FlycutFolderSync.m; sourceTree = SOURCE_ROOT; };
 		DBEB0C9A1442F2AE0080D24E /* NSWindow+ULIZoomEffect.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSWindow+ULIZoomEffect.h"; sourceTree = "<group>"; };
 		DBEB0C9B1442F2AE0080D24E /* NSWindow+ULIZoomEffect.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSWindow+ULIZoomEffect.m"; sourceTree = "<group>"; };
+		EC44780CAE70E42C40B34A3C /* FlycutBlobStore.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; name = FlycutBlobStore.h; path = FlycutEngine/FlycutBlobStore.h; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -426,6 +432,8 @@
 				77A4F3A4139BD72300F39666 /* SGHotKeysLib */,
 				8D180E161F9FD3320001F912 /* InAppSettingsKit.xcodeproj */,
 				8D0DC8391F3D4B6A00A2A8AF /* MGSwipeTableCell.xcodeproj */,
+				B83669DD8AAF0D589383A403 /* FlycutPasteboard.h */,
+				A5155217B7EE216430728980 /* FlycutPasteboard.m */,
 			);
 			name = Classes;
 			sourceTree = "<group>";
@@ -565,6 +573,8 @@
 				B337B36A7FEED20736B49677 /* FlycutSyncCrypto.h */,
 				8F4E5CDEB6B25038AB2571C1 /* FlycutSyncCrypto.m */,
 				9FDACE7308DA611506F28EA0 /* credential-rules.json */,
+				EC44780CAE70E42C40B34A3C /* FlycutBlobStore.h */,
+				9638F553A86B2BFF58DF5AB7 /* FlycutBlobStore.m */,
 			);
 			name = FlycutEngine;
 			path = JumpcutEngine;
@@ -1141,6 +1151,8 @@
 				3E5E37CA7E7275E2B171C3F1 /* FlycutServerMirror.m in Sources */,
 				F59733242F1CF1AB74235B3D /* FlycutCredentialDetector.m in Sources */,
 				F62DA0053FE99B994157036E /* FlycutSyncCrypto.m in Sources */,
+				09A5D9566A65FD0F5881DE35 /* FlycutBlobStore.m in Sources */,
+				324B5E00D7C2214DF549447A /* FlycutPasteboard.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

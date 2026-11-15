@@ -15,6 +15,7 @@
 #import "AppController.h"
 #import "FlycutServerMirror.h"
 #import "FlycutCredentialDetector.h"
+#import "FlycutPasteboard.h"
 #import "SGHotKey.h"
 #import "SGHotKeyCenter.h"
 #import "SRRecorderCell.h"
@@ -930,9 +931,9 @@
 
 - (void)pasteFromStack
 {
-	NSString *content = [flycutOperator getPasteFromStackPosition];
-	if ( nil != content ) {
-		[self addClipToPasteboard:content];
+	FlycutClipping *clipping = [flycutOperator clippingForPasteFromStackPosition];
+	if ( nil != clipping ) {
+		[self putClippingOnPasteboard:clipping];
 		[self performSelector:@selector(hideApp) withObject:nil afterDelay:0.2];
 		[self performSelector:@selector(fakeCommandV) withObject:nil afterDelay:0.2];
 	} else {
@@ -960,10 +961,10 @@
         position = [mapping[position] intValue];
     }
 
-    NSString *content = [flycutOperator getPasteFromIndex: position];
-    if ( nil != content )
+    FlycutClipping *clipping = [flycutOperator clippingForPasteFromIndex: position];
+    if ( nil != clipping )
     {
-        [self addClipToPasteboard:content];
+        [self putClippingOnPasteboard:clipping];
         [self updateMenu];
 	}
 }
@@ -1046,13 +1047,12 @@
 
 -(void)pollPB:(NSTimer *)timer
 {
-    NSString *type = [jcPasteboard availableTypeFromArray:[NSArray arrayWithObject:NSStringPboardType]];
     if ( [pbCount intValue] != [jcPasteboard changeCount] && ![flycutOperator storeDisabled] ) {
         // Reload pbCount with the current changeCount
         // Probably poor coding technique, but pollPB should be the only thing messing with pbCount, so it should be okay
         [pbCount release];
         pbCount = [[NSNumber numberWithInt:[jcPasteboard changeCount]] retain];
-        if ( type != nil ) {
+        if ( [[jcPasteboard pasteboardItems] count] > 0 ) {
 			NSRunningApplication *currRunningApp = nil;
 			for (NSRunningApplication *currApp in [[NSWorkspace sharedWorkspace] runningApplications])
 				if ([currApp isActive])
@@ -1068,7 +1068,8 @@
 			dispatch_async(queue, ^{
 
 				// This operation blocks until the transfer is complete, though it was was here before the RDC issue was discovered.  Convenient.
-                NSString *contents = [jcPasteboard stringForType:type];
+				unsigned long long sizeLimit = (unsigned long long)MAX(1, [[NSUserDefaults standardUserDefaults] integerForKey:@"clippingSizeLimitMB"]) << 20;
+				FlycutPasteboardCapture *capture = [FlycutPasteboardCapture captureFromPasteboardNamed:(NSString *)kPasteboardClipboard sizeLimit:sizeLimit];
 
 				// Toggle back if dealing with the RDC issue.
 				if (largeCopyRisk) {
@@ -1077,15 +1078,20 @@
 					});
 				}
 
-				if ( contents == nil || [flycutOperator shouldSkip:contents ofType:[jcPasteboard availableTypeFromArray:[NSArray arrayWithObject:NSStringPboardType]] fromAvailableTypes:[jcPasteboard types]] ) {
+				NSString *contents = [capture text] ?: [capture itemsDescription];
+				if ( contents == nil || [flycutOperator shouldSkip:contents ofType:[capture primaryType] fromAvailableTypes:[capture types]] ) {
                    DLog(@"Contents: Empty or skipped");
                } else {
+                   // A plain-text copy is all in its contents; anything more is kept with it.
+                   NSArray *items = [capture onlyPlainText] ? nil : [capture clippingItemsStoredIn:[flycutOperator blobStore]];
+                   BOOL described = nil == [capture text];
+                   NSString *type = [capture primaryType];
                    // Dispatch back to main queue to safely modify the clipping store and update UI.
                    // jcList (NSMutableArray) is not thread-safe, and concurrent access from this
                    // background queue and the main thread (e.g. showing the bezel) causes crashes.
                    dispatch_async(dispatch_get_main_queue(), ^{
                        if ( ! [pbCount isEqualTo:pbBlockCount] ) {
-                           [flycutOperator addClipping:contents ofType:type fromApp:[currRunningApp localizedName] withAppBundleURL:currRunningApp.bundleURL.path target:self clippingAddedSelector:@selector(updateMenu)];
+                           [flycutOperator addClipping:contents ofType:type items:items contentsDescribeItems:described fromApp:[currRunningApp localizedName] withAppBundleURL:currRunningApp.bundleURL.path target:self clippingAddedSelector:@selector(updateMenu)];
                        }
                    });
                }
@@ -1628,6 +1634,15 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
     [self setPBBlockCount:[NSNumber numberWithInt:[jcPasteboard changeCount]]];
 }
 
+// Everything the clipping was copied with, or just its text if that is all it has (or all that's left).
+-(void)putClippingOnPasteboard:(FlycutClipping *)clipping
+{
+	if ( FlycutWriteClippingItems(clipping, [flycutOperator blobStore], jcPasteboard) )
+		[self setPBBlockCount:[NSNumber numberWithInt:[jcPasteboard changeCount]]];
+	else
+		[self addClipToPasteboard:[clipping contents]];
+}
+
 -(void) stackDown
 {
 	if ( [flycutOperator setStackPositionToOneLessRecent] ) {
@@ -1732,10 +1747,9 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 }
 
 - (void)historyPanel:(HistoryPanel *)panel pasteClipping:(FlycutClipping *)clipping inFavorites:(BOOL)favorites {
-	NSString *contents = [flycutOperator pasteContentsOfClipping:clipping inFavorites:favorites];
-	if ( nil == contents )
+	if ( nil == [flycutOperator pasteContentsOfClipping:clipping inFavorites:favorites] )
 		return;
-	[self addClipToPasteboard:contents];
+	[self putClippingOnPasteboard:clipping];
 	[self updateMenu];
 	// Same as pasting from the bezel: give focus back to the app the user came from before synthesizing Cmd-V.
 	[self performSelector:@selector(hideApp) withObject:nil afterDelay:0.2];
@@ -1743,11 +1757,14 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 }
 
 - (void)historyPanel:(HistoryPanel *)panel copyClipping:(FlycutClipping *)clipping inFavorites:(BOOL)favorites {
-	NSString *contents = [flycutOperator pasteContentsOfClipping:clipping inFavorites:favorites];
-	if ( nil == contents )
+	if ( nil == [flycutOperator pasteContentsOfClipping:clipping inFavorites:favorites] )
 		return;
-	[self addClipToPasteboard:contents];
+	[self putClippingOnPasteboard:clipping];
 	[self updateMenu];
+}
+
+- (NSImage *)historyPanel:(HistoryPanel *)panel imageForClipping:(FlycutClipping *)clipping {
+	return FlycutClippingImage(clipping, [flycutOperator blobStore]);
 }
 
 - (void)historyPanel:(HistoryPanel *)panel deleteClipping:(FlycutClipping *)clipping inFavorites:(BOOL)favorites {

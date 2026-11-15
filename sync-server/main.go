@@ -8,6 +8,7 @@
 //	GET  /v1/logs/<machine>?from=N   the log's bytes from offset N; X-Log-Size has the full size
 //	POST /v1/logs/<machine>          append complete lines; 409 with X-Log-Size if X-Log-Offset isn't the current size
 //	PUT  /v1/logs/<machine>          replace the log (after a client compacts it)
+//	/v1/blobs/<machine>/...          pasteboard data the logs refer to (blobs.go)
 //
 // Clients seal credential clippings in their logs (seal.go); `flycut-sync-server reveal` reads them back.
 //
@@ -57,6 +58,10 @@ func (s *server) authorized(r *http.Request) bool {
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !s.authorized(r) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if rest, ok := strings.CutPrefix(r.URL.Path, "/v1/blobs/"); ok {
+		s.serveBlobs(w, r, rest)
 		return
 	}
 	rest, ok := strings.CutPrefix(r.URL.Path, "/v1/logs")
@@ -228,6 +233,7 @@ func (s *server) replace(w http.ResponseWriter, r *http.Request, machine string)
 		http.Error(w, "cannot write log", http.StatusInternalServerError)
 		return
 	}
+	s.removeUnreferencedBlobs(machine, body)
 	w.Header().Set("X-Log-Size", strconv.Itoa(len(body)))
 	w.WriteHeader(http.StatusNoContent)
 }

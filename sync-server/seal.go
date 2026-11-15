@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -75,9 +76,65 @@ func (s *sealer) open(sealed string) (string, error) {
 	return string(s.ctr(nonce, ciphertext)), nil
 }
 
+// openData opens a sealed blob: nonce || ciphertext || tag, unencoded.
+func (s *sealer) openData(data []byte) ([]byte, error) {
+	if len(data) < 48 {
+		return nil, errors.New("malformed sealed blob")
+	}
+	nonce, ciphertext, tag := data[:16], data[16:len(data)-32], data[len(data)-32:]
+	if !hmac.Equal(tag, s.tag(nonce, ciphertext)) {
+		return nil, errors.New("sealed with another token, or altered")
+	}
+	return s.ctr(nonce, ciphertext), nil
+}
+
+// sealData seals a blob the way clients do, with a nonce derived from the data so equal data seals the same.
+func (s *sealer) sealData(data []byte) []byte {
+	nonce := hmacSHA256(s.macKey, append([]byte("flycut-blob-v1"), data...))[:16]
+	ciphertext := s.ctr(nonce, data)
+	return append(append(append([]byte{}, nonce...), ciphertext...), s.tag(nonce, ciphertext)...)
+}
+
+var unsafeFileName = regexp.MustCompile(`[^A-Za-z0-9._-]`)
+
+// saveItems writes a clipping's pasteboard data into dir as <item>-<type>, opened.
+func saveItems(s *sealer, dataDir, dir string, c sealedClipping) error {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	for i, item := range c.Items {
+		for _, r := range item {
+			if !blobName.MatchString(r.B) {
+				continue
+			}
+			data, err := os.ReadFile(filepath.Join(dataDir, "blobs", c.Machine, r.B))
+			if err != nil {
+				return err
+			}
+			if r.S {
+				if data, err = s.openData(data); err != nil {
+					return err
+				}
+			}
+			name := filepath.Join(dir, fmt.Sprintf("%d-%s", i+1, unsafeFileName.ReplaceAllString(r.T, "_")))
+			if err := os.WriteFile(name, data, 0o600); err != nil {
+				return err
+			}
+			fmt.Fprintln(os.Stderr, "wrote", name)
+		}
+	}
+	return nil
+}
+
+type representation struct {
+	T, B string
+	S    bool
+}
+
 type sealedClipping struct {
 	Machine, ID, App, Enc string
 	At, Timestamp         int64
+	Items                 [][]representation
 }
 
 // The newest put of every clipping whose newest put is sealed, oldest first.
@@ -100,6 +157,7 @@ func sealedClippings(dir string) ([]sealedClipping, error) {
 				Op, ID, M, App, Enc string
 				List                int
 				At, Ts              int64
+				Items               [][]representation
 			}
 			if json.Unmarshal(scanner.Bytes(), &event) != nil || event.ID == "" || event.At < seen[event.ID] {
 				continue
@@ -107,7 +165,7 @@ func sealedClippings(dir string) ([]sealedClipping, error) {
 			seen[event.ID] = event.At
 			delete(latest, event.ID)
 			if event.Op == "put" && event.Enc != "" {
-				latest[event.ID] = sealedClipping{Machine: event.M, ID: event.ID, App: event.App, Enc: event.Enc, At: event.At, Timestamp: event.Ts}
+				latest[event.ID] = sealedClipping{Machine: event.M, ID: event.ID, App: event.App, Enc: event.Enc, At: event.At, Timestamp: event.Ts, Items: event.Items}
 			}
 		}
 		f.Close()
@@ -129,8 +187,9 @@ func reveal(args []string) error {
 	dataDir := flags.String("data", "", "directory holding the logs")
 	tokenFile := flags.String("token-file", "", "file containing the server token the clients seal with")
 	id := flags.String("id", "", "print this clipping's contents; without it, list the sealed clippings")
+	save := flags.String("save", "", "with -id, also write the clipping's pasteboard data (images, rich text) into this directory")
 	flags.Usage = func() {
-		fmt.Fprintln(flags.Output(), "usage: flycut-sync-server reveal -data DIR -token-file FILE [-id CLIPPING-ID]")
+		fmt.Fprintln(flags.Output(), "usage: flycut-sync-server reveal -data DIR -token-file FILE [-id CLIPPING-ID [-save DIR]]")
 		flags.PrintDefaults()
 	}
 	flags.Parse(args)
@@ -153,6 +212,8 @@ func reveal(args []string) error {
 			length := fmt.Sprintf("%d characters", len([]rune(text)))
 			if err != nil {
 				length = err.Error()
+			} else if n := len(c.Items); n > 0 {
+				length += fmt.Sprintf(", %d pasteboard item(s)", n)
 			}
 			fmt.Printf("%s  %s  %-28s %-20s %s\n", time.Unix(c.Timestamp, 0).Format("2006-01-02 15:04"), c.ID, c.Machine, c.App, length)
 		} else if c.ID == *id {
@@ -161,6 +222,9 @@ func reveal(args []string) error {
 				return err
 			}
 			fmt.Println(text)
+			if *save != "" {
+				return saveItems(s, *dataDir, *save, c)
+			}
 			return nil
 		}
 	}

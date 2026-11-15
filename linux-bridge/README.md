@@ -8,15 +8,21 @@ talks to CopyQ with `copyq eval`.
 
 | Change | Result |
 |---|---|
-| Text copied on Linux (or copied again) | Newest clipping on every Mac |
-| Clipping copied on a Mac within the last hour | Inserted on top of the CopyQ tab |
+| Anything copied on Linux (or copied again): text, rich text, an image | Newest clipping on every Mac, with every format |
+| Clipping copied on a Mac within the last hour | Inserted on top of the CopyQ tab, with its HTML, RTF, image or PDF |
 | Older Mac clipping (first sync) | Appended at the bottom of the tab |
 | Clipping deleted or history cleared on a Mac | Removed from the tab if among its top 5000 rows |
 
 Credentials (`credential-rules.json`, the same rules Flycut uses) are sealed in the server log and in the
 bridge's state, and opened again when they reach CopyQ; see [Credentials](../sync-server/README.md#credentials).
 
-Not synced: favorites, images and other non-text items, deletions made in CopyQ, CopyQ's ordering of older items.
+Formats map between MIME types and macOS pasteboard types (`text/html` and `public.html`, `image/png` and
+`public.png`, and so on); other Linux formats travel under their MIME name, and macOS-only types stay out of CopyQ.
+An image copied in CopyQ gets Flycut's label, e.g. `[image: PNG, 1920×1080, 1.2 MB]`. The data goes through the
+server as blobs (see [Pasteboard data](../sync-server/README.md#pasteboard-data)); the bridge keeps its own in
+`blobs/` under its state directory until no line of its log refers to them.
+
+Not synced: favorites, deletions made in CopyQ, CopyQ's ordering of older items.
 Items already in CopyQ when the bridge first starts stay local; `--export-existing N` shares the top N (max 20) once.
 
 ## Run

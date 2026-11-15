@@ -14,6 +14,8 @@
 
 @implementation FlycutClipping
 
+@synthesize items = clipItems, contentsDescribeItems = clipContentsDescribeItems;
+
 -(id) init
 {
     [self initWithContents:@""
@@ -251,6 +253,34 @@
     credentialState = newState;
 }
 
+-(NSString *) itemsFingerprint
+{
+	NSMutableString *fingerprint = [NSMutableString string];
+	for ( NSArray *item in clipItems ) {
+		[fingerprint appendString:@"|"];
+		for ( NSDictionary *representation in item )
+			[fingerprint appendFormat:@"%@=%@;", [representation objectForKey:@"t"], [representation objectForKey:@"b"]];
+	}
+	return fingerprint;
+}
+
+-(NSString *) dedupeKey
+{
+	return clipContentsDescribeItems ? [@"\x01" stringByAppendingString:[self itemsFingerprint]] : clipContents;
+}
+
+-(NSArray *) blobAddresses
+{
+	NSMutableArray *addresses = [NSMutableArray array];
+	for ( NSArray *item in clipItems )
+		for ( NSDictionary *representation in item )
+			if ( [representation objectForKey:@"b"] )
+				[addresses addObject:[representation objectForKey:@"b"]];
+	return addresses;
+}
+
+// Text clippings are equal when their text is, whatever else they were copied with; clippings that
+// only describe their data (images, files) are equal when that data is.
 - (BOOL)isEqual:(id)other {
     if (other == self)
         return YES;
@@ -258,7 +288,7 @@
         return NO;
     FlycutClipping * otherClip = (FlycutClipping *)other;
     return (/*[self.type isEqualToString:otherClip.type] &&*/ // Type is under-utilized a this time and will mismatch on cross-device (macOS <-> iOS) usage.  This should be revisited once we have support for more than just raw text clippings.
-            [self.contents isEqualToString:otherClip.contents]);
+            [self.dedupeKey isEqualToString:otherClip.dedupeKey]);
 }
 
 
@@ -270,6 +300,7 @@
     [appLocalizedName release];
     [appBundleURL release];
     [clipId release];
+    [clipItems release];
     clipDisplayLength = 0;
     [clipDisplayString release];
     clipHasName = 0;
