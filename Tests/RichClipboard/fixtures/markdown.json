@@ -1,0 +1,526 @@
+[
+  {
+    "name": "chat message",
+    "markdown": "Hi team, a **quick** update on the\nmigration with a [link](https://example.com/a?b=c).\n\nHere is the detail:\n\n1. First item with **bold**\n2. Second item\n   - nested bullet\n3. Third\n\nAfter the list, a paragraph.\n\nFinal words.",
+    "plain": "Hi team, a quick update on the migration with a link (https://example.com/a?b=c).\n\nHere is the detail:\nFirst item with bold\nSecond item\nnested bullet\nThird\n\nAfter the list, a paragraph.\n\nFinal words.",
+    "readable": "Hi team, a quick update on the migration with a link (https://example.com/a?b=c).\n\nHere is the detail:\n1. First item with bold\n2. Second item\n   - nested bullet\n3. Third\n\nAfter the list, a paragraph.\n\nFinal words.",
+    "html": "<meta charset=\"utf-8\"><p>Hi team, a <strong>quick</strong> update on the migration with a <a href=\"https://example.com/a?b=c\">link</a>.</p>\n<p>Here is the detail:</p>\n<ol>\n<li>First item with <strong>bold</strong></li>\n<li>Second item\n<ul>\n<li>nested bullet</li>\n</ul>\n</li>\n<li>Third</li>\n</ol>\n<p>After the list, a paragraph.</p>\n<p>Final words.</p>\n",
+    "delta": {
+      "ops": [
+        {
+          "insert": "Hi team, a "
+        },
+        {
+          "attributes": {
+            "bold": true
+          },
+          "insert": "quick"
+        },
+        {
+          "insert": " update on the migration with a "
+        },
+        {
+          "attributes": {
+            "link": "https://example.com/a?b=c"
+          },
+          "insert": "link"
+        },
+        {
+          "insert": ".\n\nHere is the detail:\nFirst item with "
+        },
+        {
+          "attributes": {
+            "bold": true
+          },
+          "insert": "bold"
+        },
+        {
+          "attributes": {
+            "list": "ordered"
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "Second item"
+        },
+        {
+          "attributes": {
+            "list": "ordered"
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "nested bullet"
+        },
+        {
+          "attributes": {
+            "indent": 1,
+            "list": "bullet"
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "Third"
+        },
+        {
+          "attributes": {
+            "list": "ordered"
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "\nAfter the list, a paragraph.\n\nFinal words."
+        }
+      ]
+    }
+  },
+  {
+    "name": "headings and hard breaks",
+    "markdown": "# Title\nFirst line\\\nsecond line  \nthird line\n\n## Sub *head*\nText.",
+    "plain": "Title\n\nFirst line\nsecond line\nthird line\n\nSub head\n\nText.",
+    "readable": "Title\n\nFirst line\nsecond line\nthird line\n\nSub head\n\nText.",
+    "html": "<meta charset=\"utf-8\"><h1>Title</h1>\n<p>First line<br />\nsecond line<br />\nthird line</p>\n<h2>Sub <em>head</em></h2>\n<p>Text.</p>\n",
+    "delta": {
+      "ops": [
+        {
+          "attributes": {
+            "bold": true
+          },
+          "insert": "Title"
+        },
+        {
+          "insert": "\n\nFirst line\nsecond line\nthird line\n\n"
+        },
+        {
+          "attributes": {
+            "bold": true
+          },
+          "insert": "Sub "
+        },
+        {
+          "attributes": {
+            "bold": true,
+            "italic": true
+          },
+          "insert": "head"
+        },
+        {
+          "insert": "\n\nText."
+        }
+      ]
+    }
+  },
+  {
+    "name": "deep and mixed lists",
+    "markdown": "Steps:\n3. third\n4. fourth\n    - a\n        1. deep one\n        2. deep two\n    - b\n5. fifth\n\n- x\n- y\n",
+    "plain": "Steps:\nthird\nfourth\na\ndeep one\ndeep two\nb\nfifth\nx\ny",
+    "readable": "Steps:\n3. third\n4. fourth\n   - a\n      1. deep one\n      2. deep two\n   - b\n5. fifth\n- x\n- y",
+    "html": "<meta charset=\"utf-8\"><p>Steps:</p>\n<ol start=\"3\">\n<li>third</li>\n<li>fourth\n<ul>\n<li>a\n<ol>\n<li>deep one</li>\n<li>deep two</li>\n</ol>\n</li>\n<li>b</li>\n</ul>\n</li>\n<li>fifth</li>\n</ol>\n<ul>\n<li>x</li>\n<li>y</li>\n</ul>\n",
+    "delta": {
+      "ops": [
+        {
+          "insert": "Steps:\nthird"
+        },
+        {
+          "attributes": {
+            "list": "ordered"
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "fourth"
+        },
+        {
+          "attributes": {
+            "list": "ordered"
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "a"
+        },
+        {
+          "attributes": {
+            "indent": 1,
+            "list": "bullet"
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "deep one"
+        },
+        {
+          "attributes": {
+            "indent": 2,
+            "list": "ordered"
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "deep two"
+        },
+        {
+          "attributes": {
+            "indent": 2,
+            "list": "ordered"
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "b"
+        },
+        {
+          "attributes": {
+            "indent": 1,
+            "list": "bullet"
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "fifth"
+        },
+        {
+          "attributes": {
+            "list": "ordered"
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "x"
+        },
+        {
+          "attributes": {
+            "list": "bullet"
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "y"
+        },
+        {
+          "attributes": {
+            "list": "bullet"
+          },
+          "insert": "\n"
+        }
+      ]
+    }
+  },
+  {
+    "name": "code, quote, rule",
+    "markdown": "Run this:\n\n```sh\necho \"<hi>\" && ls *.md\n  indented\n```\n\n> quoted **one**\n> quoted two\n>\n> after gap\n\n---\n\nDone.",
+    "plain": "Run this:\n\necho \"<hi>\" && ls *.md\n  indented\n\nquoted one\nquoted two\n\nafter gap\n\n---\n\nDone.",
+    "readable": "Run this:\n\n```sh\necho \"<hi>\" && ls *.md\n  indented\n```\n\n> quoted one\n> quoted two\n>\n> after gap\n\n---\n\nDone.",
+    "html": "<meta charset=\"utf-8\"><p>Run this:</p>\n<pre><code class=\"language-sh\">echo &quot;&lt;hi&gt;&quot; &amp;&amp; ls *.md\n  indented\n</code></pre>\n<blockquote>\n<p>quoted <strong>one</strong><br />\nquoted two</p>\n<p>after gap</p>\n</blockquote>\n<hr />\n<p>Done.</p>\n",
+    "delta": {
+      "ops": [
+        {
+          "insert": "Run this:\n\necho \"<hi>\" && ls *.md"
+        },
+        {
+          "attributes": {
+            "code-block": true
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "  indented"
+        },
+        {
+          "attributes": {
+            "code-block": true
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "\nquoted "
+        },
+        {
+          "attributes": {
+            "bold": true
+          },
+          "insert": "one"
+        },
+        {
+          "attributes": {
+            "blockquote": true
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "quoted two"
+        },
+        {
+          "attributes": {
+            "blockquote": true
+          },
+          "insert": "\n\n"
+        },
+        {
+          "insert": "after gap"
+        },
+        {
+          "attributes": {
+            "blockquote": true
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "\n---\n\nDone."
+        }
+      ]
+    }
+  },
+  {
+    "name": "inline zoo",
+    "markdown": "**b** *i* _u_ ~~s~~ `co*de` ``a`b`` **[bold link](https://x.test/p_(1))** <https://auto.test> see https://bare.test/x. snake_case_name 2 * 3 * 4 \\*lit\\* ***both*** [t](<https://sp.test/a b>)",
+    "plain": "b i u s co*de a`b bold link (https://x.test/p_(1)) https://auto.test see https://bare.test/x. snake_case_name 2 * 3 * 4 *lit* both t (https://sp.test/a b)",
+    "readable": "b i u s co*de a`b bold link (https://x.test/p_(1)) https://auto.test see https://bare.test/x. snake_case_name 2 * 3 * 4 *lit* both t (https://sp.test/a b)",
+    "html": "<meta charset=\"utf-8\"><p><strong>b</strong> <em>i</em> <em>u</em> <del>s</del> <code>co*de</code> <code>a`b</code> <a href=\"https://x.test/p_(1)\"><strong>bold link</strong></a> <a href=\"https://auto.test\">https://auto.test</a> see <a href=\"https://bare.test/x\">https://bare.test/x</a>. snake_case_name 2 * 3 * 4 *lit* <strong><em>both</em></strong> <a href=\"https://sp.test/a b\">t</a></p>\n",
+    "delta": {
+      "ops": [
+        {
+          "attributes": {
+            "bold": true
+          },
+          "insert": "b"
+        },
+        {
+          "insert": " "
+        },
+        {
+          "attributes": {
+            "italic": true
+          },
+          "insert": "i"
+        },
+        {
+          "insert": " "
+        },
+        {
+          "attributes": {
+            "italic": true
+          },
+          "insert": "u"
+        },
+        {
+          "insert": " "
+        },
+        {
+          "attributes": {
+            "strike": true
+          },
+          "insert": "s"
+        },
+        {
+          "insert": " "
+        },
+        {
+          "attributes": {
+            "code": true
+          },
+          "insert": "co*de"
+        },
+        {
+          "insert": " "
+        },
+        {
+          "attributes": {
+            "code": true
+          },
+          "insert": "a`b"
+        },
+        {
+          "insert": " "
+        },
+        {
+          "attributes": {
+            "bold": true,
+            "link": "https://x.test/p_(1)"
+          },
+          "insert": "bold link"
+        },
+        {
+          "insert": " "
+        },
+        {
+          "attributes": {
+            "link": "https://auto.test"
+          },
+          "insert": "https://auto.test"
+        },
+        {
+          "insert": " see "
+        },
+        {
+          "attributes": {
+            "link": "https://bare.test/x"
+          },
+          "insert": "https://bare.test/x"
+        },
+        {
+          "insert": ". snake_case_name 2 * 3 * 4 *lit* "
+        },
+        {
+          "attributes": {
+            "bold": true,
+            "italic": true
+          },
+          "insert": "both"
+        },
+        {
+          "insert": " "
+        },
+        {
+          "attributes": {
+            "link": "https://sp.test/a b"
+          },
+          "insert": "t"
+        }
+      ]
+    }
+  },
+  {
+    "name": "table",
+    "markdown": "| Name | Count |\n|---|--:|\n| **a** | 1 |\n| b \\| c | 22 |\n\nAfter.",
+    "plain": "| Name  | Count |\n|-------|-------|\n| a     | 1     |\n| b | c | 22    |\n\nAfter.",
+    "readable": "| Name  | Count |\n|-------|-------|\n| a     | 1     |\n| b | c | 22    |\n\nAfter.",
+    "html": "<meta charset=\"utf-8\"><table>\n<thead>\n<tr>\n<th>Name</th>\n<th>Count</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td><strong>a</strong></td>\n<td>1</td>\n</tr>\n<tr>\n<td>b | c</td>\n<td>22</td>\n</tr>\n</tbody>\n</table>\n<p>After.</p>\n",
+    "delta": {
+      "ops": [
+        {
+          "insert": "| Name  | Count |"
+        },
+        {
+          "attributes": {
+            "code-block": true
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "|-------|-------|"
+        },
+        {
+          "attributes": {
+            "code-block": true
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "| a     | 1     |"
+        },
+        {
+          "attributes": {
+            "code-block": true
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "| b | c | 22    |"
+        },
+        {
+          "attributes": {
+            "code-block": true
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "\nAfter."
+        }
+      ]
+    }
+  },
+  {
+    "name": "html escaping",
+    "markdown": "<b>not html</b> & \"quotes\" > arrow",
+    "plain": "<b>not html</b> & \"quotes\" > arrow",
+    "readable": "<b>not html</b> & \"quotes\" > arrow",
+    "html": "<meta charset=\"utf-8\"><p>&lt;b&gt;not html&lt;/b&gt; &amp; &quot;quotes&quot; &gt; arrow</p>\n",
+    "delta": {
+      "ops": [
+        {
+          "insert": "<b>not html</b> & \"quotes\" > arrow"
+        }
+      ]
+    }
+  },
+  {
+    "name": "unicode",
+    "markdown": "Zażółć **gęślą** jaźń 👋\n\n- ünï\n- ✓ done",
+    "plain": "Zażółć gęślą jaźń 👋\nünï\n✓ done",
+    "readable": "Zażółć gęślą jaźń 👋\n- ünï\n- ✓ done",
+    "html": "<meta charset=\"utf-8\"><p>Zażółć <strong>gęślą</strong> jaźń 👋</p>\n<ul>\n<li>ünï</li>\n<li>✓ done</li>\n</ul>\n",
+    "delta": {
+      "ops": [
+        {
+          "insert": "Zażółć "
+        },
+        {
+          "attributes": {
+            "bold": true
+          },
+          "insert": "gęślą"
+        },
+        {
+          "insert": " jaźń 👋\nünï"
+        },
+        {
+          "attributes": {
+            "list": "bullet"
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "✓ done"
+        },
+        {
+          "attributes": {
+            "list": "bullet"
+          },
+          "insert": "\n"
+        }
+      ]
+    }
+  },
+  {
+    "name": "list then heading",
+    "markdown": "- a\n- b\n# H\npara",
+    "plain": "a\nb\n\nH\n\npara",
+    "readable": "- a\n- b\n\nH\n\npara",
+    "html": "<meta charset=\"utf-8\"><ul>\n<li>a</li>\n<li>b</li>\n</ul>\n<h1>H</h1>\n<p>para</p>\n",
+    "delta": {
+      "ops": [
+        {
+          "insert": "a"
+        },
+        {
+          "attributes": {
+            "list": "bullet"
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "b"
+        },
+        {
+          "attributes": {
+            "list": "bullet"
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "\n"
+        },
+        {
+          "attributes": {
+            "bold": true
+          },
+          "insert": "H"
+        },
+        {
+          "insert": "\n\npara"
+        }
+      ]
+    }
+  }
+]

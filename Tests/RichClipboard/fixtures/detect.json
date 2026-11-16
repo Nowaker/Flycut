@@ -1,0 +1,82 @@
+[
+  {
+    "name": "chat message",
+    "text": "Hi team, a **quick** update on the\nmigration with a [link](https://example.com/a?b=c).\n\nHere is the detail:\n\n1. First item with **bold**\n2. Second item\n   - nested bullet\n3. Third\n\nAfter the list, a paragraph.\n\nFinal words.",
+    "markdown": true
+  },
+  {
+    "name": "todo list",
+    "text": "Things:\n- milk\n- eggs",
+    "markdown": true
+  },
+  {
+    "name": "bold in two lines",
+    "text": "This is **important**.\nSecond line here.",
+    "markdown": true
+  },
+  {
+    "name": "link in two lines",
+    "text": "See [the doc](https://d.test).\nThanks",
+    "markdown": true
+  },
+  {
+    "name": "heading with sentence",
+    "text": "# Notes\n\nWe agreed to ship the release on Friday.",
+    "markdown": true
+  },
+  {
+    "name": "fenced code with prose",
+    "text": "Run:\n\n```\nmake test\n```",
+    "markdown": true
+  },
+  {
+    "name": "single line bold",
+    "text": "just **one** line",
+    "markdown": false
+  },
+  {
+    "name": "plain prose",
+    "text": "Hello there,\nhow are you today?",
+    "markdown": false
+  },
+  {
+    "name": "italic only",
+    "text": "an *aside* here\nand more",
+    "markdown": false
+  },
+  {
+    "name": "python script",
+    "text": "# compute totals\nimport os\n\ndef total(xs):\n    return sum(xs)\n\nprint(total([1, 2]))",
+    "markdown": false
+  },
+  {
+    "name": "shell script with comments",
+    "text": "# install deps\nsudo pacman -S foo\n# build it\nmake -j8",
+    "markdown": false
+  },
+  {
+    "name": "log lines",
+    "text": "2026-11-16 07:01:02 INFO start\n2026-11-16 07:01:03 WARN - slow\n- retry 1\n- retry 2",
+    "markdown": false
+  },
+  {
+    "name": "diff",
+    "text": "diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n- old\n+ new",
+    "markdown": false
+  },
+  {
+    "name": "json",
+    "text": "{\n  \"a\": [1, 2],\n  \"b\": \"**x**\"\n}",
+    "markdown": false
+  },
+  {
+    "name": "js code with bold glob",
+    "text": "const files = glob('**/*.ts');\nfor (const f of files) {\n  run(f);\n}",
+    "markdown": false
+  },
+  {
+    "name": "shell prompt output",
+    "text": "$ ls\n- a.txt\n- b.txt\n$ echo done",
+    "markdown": false
+  }
+]

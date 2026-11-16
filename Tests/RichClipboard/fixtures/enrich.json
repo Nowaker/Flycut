@@ -1,0 +1,157 @@
+[
+  {
+    "name": "slack composer copy",
+    "input": {
+      "text": "flat slack plain text",
+      "webCustomData": "iAYAAAIAAAAWAAAAcAB1AGIAbABpAGMALgB1AHQAZgA4AC0AcABsAGEAaQBuAC0AdABlAHgAdAAVAAAAZgBsAGEAdAAgAHMAbABhAGMAawAgAHAAbABhAGkAbgAgAHQAZQB4AHQAAAALAAAAcwBsAGEAYwBrAC8AdABlAHgAdAB5AAAAAgMAAHsAIgBvAHAAcwAiADoAWwB7ACIAaQBuAHMAZQByAHQAIgA6ACIASABlAGwAbABvACAAdABlAGEAbQAsACAAaABlAHIAZQAgAGkAcwAgAHQAaABlACAAdQBwAGQAYQB0AGUAIAB3AGkAdABoACAAYQAgACIAfQAsAHsAIgBhAHQAdAByAGkAYgB1AHQAZQBzACIAOgB7ACIAbABpAG4AawAiADoAIgBoAHQAdABwAHMAOgAvAC8AZABvAGMAcwAuAHQAZQBzAHQALwBzAGgAZQBlAHQAIgB9ACwAIgBpAG4AcwBlAHIAdAAiADoAIgBzAGgAZQBlAHQAIgB9ACwAewAiAGkAbgBzAGUAcgB0ACIAOgAiAC4AXABuAFwAbgBUAGgAZQAgAHAAbABhAG4AOgBcAG4AIgB9ACwAewAiAGEAdAB0AHIAaQBiAHUAdABlAHMAIgA6AHsAIgBiAG8AbABkACIAOgB0AHIAdQBlAH0ALAAiAGkAbgBzAGUAcgB0ACIAOgAiAEYAaQByAHMAdAA6ACIAfQAsAHsAIgBpAG4AcwBlAHIAdAAiADoAIgAgAGQAbwAgAHQAaABlACAAdABoAGkAbgBnACIAfQAsAHsAIgBhAHQAdAByAGkAYgB1AHQAZQBzACIAOgB7ACIAbABpAHMAdAAiADoAIgBvAHIAZABlAHIAZQBkACIAfQAsACIAaQBuAHMAZQByAHQAIgA6ACIAXABuACIAfQAsAHsAIgBhAHQAdAByAGkAYgB1AHQAZQBzACIAOgB7ACIAYgBvAGwAZAAiADoAdAByAHUAZQB9ACwAIgBpAG4AcwBlAHIAdAAiADoAIgBTAGUAYwBvAG4AZAA6ACIAfQAsAHsAIgBpAG4AcwBlAHIAdAAiADoAIgAgAG0AbwByAGUAIgB9ACwAewAiAGEAdAB0AHIAaQBiAHUAdABlAHMAIgA6AHsAIgBsAGkAcwB0ACIAOgAiAG8AcgBkAGUAcgBlAGQAIgB9ACwAIgBpAG4AcwBlAHIAdAAiADoAIgBcAG4AIgB9ACwAewAiAGkAbgBzAGUAcgB0ACIAOgAiAG4AZQBzAHQAZQBkACAAYQAiAH0ALAB7ACIAYQB0AHQAcgBpAGIAdQB0AGUAcwAiADoAewAiAGkAbgBkAGUAbgB0ACIAOgAxACwAIgBsAGkAcwB0ACIAOgAiAGIAdQBsAGwAZQB0ACIAfQAsACIAaQBuAHMAZQByAHQAIgA6ACIAXABuACIAfQAsAHsAIgBpAG4AcwBlAHIAdAAiADoAIgBuAGUAcwB0AGUAZAAgAGIAIgB9ACwAewAiAGEAdAB0AHIAaQBiAHUAdABlAHMAIgA6AHsAIgBpAG4AZABlAG4AdAAiADoAMQAsACIAbABpAHMAdAAiADoAIgBiAHUAbABsAGUAdAAiAH0ALAAiAGkAbgBzAGUAcgB0ACIAOgAiAFwAbgAiAH0ALAB7ACIAYQB0AHQAcgBpAGIAdQB0AGUAcwAiADoAewAiAGIAbwBsAGQAIgA6AHQAcgB1AGUAfQAsACIAaQBuAHMAZQByAHQAIgA6ACIAVABoAGkAcgBkADoAIgB9ACwAewAiAGkAbgBzAGUAcgB0ACIAOgAiACAAZQBuAGQAIgB9ACwAewAiAGEAdAB0AHIAaQBiAHUAdABlAHMAIgA6AHsAIgBsAGkAcwB0ACIAOgAiAG8AcgBkAGUAcgBlAGQAIgB9ACwAIgBpAG4AcwBlAHIAdAAiADoAIgBcAG4AIgB9ACwAewAiAGkAbgBzAGUAcgB0ACIAOgAiAFwAbgBUAGgAYQBuAGsAcwAgACIAfQAsAHsAIgBhAHQAdAByAGkAYgB1AHQAZQBzACIAOgB7ACIAcwBsAGEAYwBrAHMAbAB1AGcAIgA6ACIAYQBiAGMAIgB9ACwAIgBpAG4AcwBlAHIAdAAiADoAIgAjAGcAZQBuAGUAcgBhAGwAIgB9ACwAewAiAGkAbgBzAGUAcgB0ACIAOgAiAFwAbgBsAGkAbgBlACAAdAB3AG8AIgB9AF0AfQA="
+    },
+    "expected": {
+      "kind": "slack",
+      "markdown": "Hello team, here is the update with a [sheet](https://docs.test/sheet).\n\nThe plan:\n\n1. **First:** do the thing\n2. **Second:** more\n    - nested a\n    - nested b\n3. **Third:** end\n\nThanks #general\\\nline two",
+      "text": "Hello team, here is the update with a sheet (https://docs.test/sheet).\n\nThe plan:\n1. First: do the thing\n2. Second: more\n   - nested a\n   - nested b\n3. Third: end\n\nThanks #general\nline two",
+      "html": "<meta charset=\"utf-8\"><p>Hello team, here is the update with a <a href=\"https://docs.test/sheet\">sheet</a>.</p>\n<p>The plan:</p>\n<ol>\n<li><strong>First:</strong> do the thing</li>\n<li><strong>Second:</strong> more\n<ul>\n<li>nested a</li>\n<li>nested b</li>\n</ul>\n</li>\n<li><strong>Third:</strong> end</li>\n</ol>\n<p>Thanks #general<br />\nline two</p>\n",
+      "pairs": [
+        [
+          "public.utf8-plain-text",
+          "flat slack plain text"
+        ],
+        [
+          "slack/texty",
+          "{\"ops\":[{\"insert\":\"Hello team, here is the update with a \"},{\"attributes\":{\"link\":\"https://docs.test/sheet\"},\"insert\":\"sheet\"},{\"insert\":\".\\n\\nThe plan:\\n\"},{\"attributes\":{\"bold\":true},\"insert\":\"First:\"},{\"insert\":\" do the thing\"},{\"attributes\":{\"list\":\"ordered\"},\"insert\":\"\\n\"},{\"attributes\":{\"bold\":true},\"insert\":\"Second:\"},{\"insert\":\" more\"},{\"attributes\":{\"list\":\"ordered\"},\"insert\":\"\\n\"},{\"insert\":\"nested a\"},{\"attributes\":{\"indent\":1,\"list\":\"bullet\"},\"insert\":\"\\n\"},{\"insert\":\"nested b\"},{\"attributes\":{\"indent\":1,\"list\":\"bullet\"},\"insert\":\"\\n\"},{\"attributes\":{\"bold\":true},\"insert\":\"Third:\"},{\"insert\":\" end\"},{\"attributes\":{\"list\":\"ordered\"},\"insert\":\"\\n\"},{\"insert\":\"\\nThanks \"},{\"attributes\":{\"slackslug\":\"abc\"},\"insert\":\"#general\"},{\"insert\":\"\\nline two\"}]}"
+        ],
+        [
+          "application/x-rich-clipboard-source",
+          "slack"
+        ]
+      ]
+    }
+  },
+  {
+    "name": "slack html only",
+    "input": {
+      "text": "flat",
+      "html": "<meta charset=\"utf-8\"><div class=\"p-rich_text_section\"><b data-stringify-type=\"bold\">Title:</b> intro with <a target=\"_blank\" class=\"c-link\" data-stringify-link=\"https://example.com/x\" href=\"https://example.com/x\" rel=\"noopener noreferrer\">a link</a> and <code data-stringify-type=\"code\" class=\"c-mrkdwn__code\">code</code><span aria-label=\" \" class=\"c-mrkdwn__br\" data-stringify-type=\"paragraph-break\"></span>second <i data-stringify-type=\"italic\">para</i><br aria-hidden=\"true\">line two</div><ul data-stringify-type=\"unordered-list\" data-list-tree=\"true\" class=\"p-rich_text_list p-rich_text_list__bullet\" data-indent=\"0\" data-border=\"0\"><li data-stringify-indent=\"0\" data-stringify-border=\"0\">parent<ul data-stringify-type=\"unordered-list\" data-list-tree=\"true\" class=\"p-rich_text_list\" data-indent=\"1\" data-border=\"0\"><li data-stringify-indent=\"1\" data-stringify-border=\"0\">child</li></ul></li><li data-stringify-indent=\"0\" data-stringify-border=\"0\">sibling</li></ul><ol data-stringify-type=\"ordered-list\" class=\"p-rich_text_list\" data-indent=\"0\" data-border=\"0\"><li data-stringify-indent=\"0\">first</li><li data-stringify-indent=\"0\">second</li></ol><pre data-stringify-type=\"pre\" class=\"p-rich_text_block\">const x = 1;\nif (a &lt; b) {}\n</pre><blockquote data-stringify-type=\"quote\">\n<div data-slack-paragraph=\"true\">quoted text</div>\n</blockquote><div class=\"p-rich_text_section\"><s data-stringify-type=\"strike\">old</s> end <img data-stringify-type=\"emoji\" data-stringify-emoji=\":tada:\" alt=\"tada\"></div>"
+    },
+    "expected": {
+      "kind": "slack",
+      "markdown": "**Title:** intro with [a link](https://example.com/x) and `code`\n\nsecond _para_\\\nline two\n\n- parent\n    - child\n- sibling\n\n1. first\n2. second\n\n```\nconst x = 1;\nif (a < b) {}\n```\n\n> quoted text\n\n~~old~~ end :tada:",
+      "text": "Title: intro with a link (https://example.com/x) and code\n\nsecond para\nline two\n- parent\n   - child\n- sibling\n1. first\n2. second\n\n```\nconst x = 1;\nif (a < b) {}\n```\n\n> quoted text\n\nold end :tada:",
+      "html": "<meta charset=\"utf-8\"><div class=\"p-rich_text_section\"><b data-stringify-type=\"bold\">Title:</b> intro with <a target=\"_blank\" class=\"c-link\" data-stringify-link=\"https://example.com/x\" href=\"https://example.com/x\" rel=\"noopener noreferrer\">a link</a> and <code data-stringify-type=\"code\" class=\"c-mrkdwn__code\">code</code><span aria-label=\" \" class=\"c-mrkdwn__br\" data-stringify-type=\"paragraph-break\"></span>second <i data-stringify-type=\"italic\">para</i><br aria-hidden=\"true\">line two</div><ul data-stringify-type=\"unordered-list\" data-list-tree=\"true\" class=\"p-rich_text_list p-rich_text_list__bullet\" data-indent=\"0\" data-border=\"0\"><li data-stringify-indent=\"0\" data-stringify-border=\"0\">parent<ul data-stringify-type=\"unordered-list\" data-list-tree=\"true\" class=\"p-rich_text_list\" data-indent=\"1\" data-border=\"0\"><li data-stringify-indent=\"1\" data-stringify-border=\"0\">child</li></ul></li><li data-stringify-indent=\"0\" data-stringify-border=\"0\">sibling</li></ul><ol data-stringify-type=\"ordered-list\" class=\"p-rich_text_list\" data-indent=\"0\" data-border=\"0\"><li data-stringify-indent=\"0\">first</li><li data-stringify-indent=\"0\">second</li></ol><pre data-stringify-type=\"pre\" class=\"p-rich_text_block\">const x = 1;\nif (a &lt; b) {}\n</pre><blockquote data-stringify-type=\"quote\">\n<div data-slack-paragraph=\"true\">quoted text</div>\n</blockquote><div class=\"p-rich_text_section\"><s data-stringify-type=\"strike\">old</s> end <img data-stringify-type=\"emoji\" data-stringify-emoji=\":tada:\" alt=\"tada\"></div>",
+      "pairs": [
+        [
+          "application/x-rich-clipboard-source",
+          "slack"
+        ]
+      ]
+    }
+  },
+  {
+    "name": "markdown plain text",
+    "input": {
+      "text": "Plan:\n\n1. **one**\n2. two\n   - [link](https://l.test)"
+    },
+    "expected": {
+      "kind": "markdown",
+      "markdown": "Plan:\n\n1. **one**\n2. two\n   - [link](https://l.test)",
+      "text": "Plan:\n\n1. **one**\n2. two\n   - [link](https://l.test)",
+      "html": "<meta charset=\"utf-8\"><p>Plan:</p>\n<ol>\n<li><strong>one</strong></li>\n<li>two\n<ul>\n<li><a href=\"https://l.test\">link</a></li>\n</ul>\n</li>\n</ol>\n",
+      "pairs": [
+        [
+          "public.utf8-plain-text",
+          "Plan:\n\n1. **one**\n2. two\n   - [link](https://l.test)"
+        ],
+        [
+          "slack/texty",
+          "{\"ops\":[{\"insert\":\"Plan:\\n\"},{\"attributes\":{\"bold\":true},\"insert\":\"one\"},{\"attributes\":{\"list\":\"ordered\"},\"insert\":\"\\n\"},{\"insert\":\"two\"},{\"attributes\":{\"list\":\"ordered\"},\"insert\":\"\\n\"},{\"attributes\":{\"link\":\"https://l.test\"},\"insert\":\"link\"},{\"attributes\":{\"indent\":1,\"list\":\"bullet\"},\"insert\":\"\\n\"}]}"
+        ],
+        [
+          "application/x-rich-clipboard-source",
+          "markdown"
+        ]
+      ]
+    }
+  },
+  {
+    "name": "markdown flavor beside html",
+    "input": {
+      "text": "x",
+      "markdown": "# T\n\nbody **b**",
+      "html": "<p>x</p>"
+    },
+    "expected": {
+      "kind": "markdown",
+      "markdown": "# T\n\nbody **b**",
+      "text": "x",
+      "html": "<meta charset=\"utf-8\"><h1>T</h1>\n<p>body <strong>b</strong></p>\n",
+      "pairs": [
+        [
+          "public.utf8-plain-text",
+          "x"
+        ],
+        [
+          "slack/texty",
+          "{\"ops\":[{\"attributes\":{\"bold\":true},\"insert\":\"T\"},{\"insert\":\"\\n\\nbody \"},{\"attributes\":{\"bold\":true},\"insert\":\"b\"}]}"
+        ],
+        [
+          "application/x-rich-clipboard-source",
+          "markdown"
+        ]
+      ]
+    }
+  },
+  {
+    "name": "markdown over editor html and foreign pairs",
+    "input": {
+      "text": "- a\n- b",
+      "html": "<pre>- a</pre>",
+      "webCustomData": "aAAAAAIAAAASAAAAdgBzAGMAbwBkAGUALQBlAGQAaQB0AG8AcgAtAGQAYQB0AGEAAgAAAHsAfQALAAAAcwBsAGEAYwBrAC8AdABlAHgAdAB5AAAACgAAAHsAIgBvAHAAcwAiADoAWwBdAH0A"
+    },
+    "expected": {
+      "kind": "markdown",
+      "markdown": "- a\n- b",
+      "text": "- a\n- b",
+      "html": "<meta charset=\"utf-8\"><ul>\n<li>a</li>\n<li>b</li>\n</ul>\n",
+      "pairs": [
+        [
+          "public.utf8-plain-text",
+          "- a\n- b"
+        ],
+        [
+          "slack/texty",
+          "{\"ops\":[{\"insert\":\"a\"},{\"attributes\":{\"list\":\"bullet\"},\"insert\":\"\\n\"},{\"insert\":\"b\"},{\"attributes\":{\"list\":\"bullet\"},\"insert\":\"\\n\"}]}"
+        ],
+        [
+          "vscode-editor-data",
+          "{}"
+        ],
+        [
+          "application/x-rich-clipboard-source",
+          "markdown"
+        ]
+      ]
+    }
+  },
+  {
+    "name": "already enriched",
+    "input": {
+      "text": "- a\n- b",
+      "webCustomData": "ZAAAAAEAAAAjAAAAYQBwAHAAbABpAGMAYQB0AGkAbwBuAC8AeAAtAHIAaQBjAGgALQBjAGwAaQBwAGIAbwBhAHIAZAAtAHMAbwB1AHIAYwBlAAAACAAAAG0AYQByAGsAZABvAHcAbgA="
+    },
+    "expected": null
+  },
+  {
+    "name": "not markdown",
+    "input": {
+      "text": "plain words\nmore plain words"
+    },
+    "expected": null
+  },
+  {
+    "name": "malformed custom data",
+    "input": {
+      "text": "plain words\nmore",
+      "webCustomData": "AQID"
+    },
+    "expected": null
+  }
+]

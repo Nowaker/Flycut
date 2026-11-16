@@ -16,6 +16,7 @@
 #import "FlycutServerMirror.h"
 #import "FlycutCredentialDetector.h"
 #import "FlycutPasteboard.h"
+#import "FlycutRichClipboard.h"
 #import "SGHotKey.h"
 #import "SGHotKeyCenter.h"
 #import "SRRecorderCell.h"
@@ -85,6 +86,8 @@
         @"syncFolderEnabled",
         [NSNumber numberWithBool:NO],
         @"syncServerEnabled",
+        [NSNumber numberWithBool:YES],
+        @"richClipboardFormats",
         nil]];
 
 	/* For testing, the ability to force initial values of the sync settings:
@@ -109,6 +112,7 @@
 						 @"saveForgottenFavorites",
                          @"suppressAccessibilityAlert",
                          @"mainHotkeyPopup",
+                         @"richClipboardFormats",
                         ];
 	[settingsSyncList retain];
 
@@ -1155,6 +1159,9 @@
         // Probably poor coding technique, but pollPB should be the only thing messing with pbCount, so it should be okay
         [pbCount release];
         pbCount = [[NSNumber numberWithInt:[jcPasteboard changeCount]] retain];
+        // Flycut's own paste: never given rich formats again (setPBBlockCount marked it).
+        BOOL ownWrite = [pbCount isEqualTo:pbBlockCount];
+        NSInteger capturedCount = [pbCount integerValue];
         if ( [[jcPasteboard pasteboardItems] count] > 0 ) {
 			NSRunningApplication *currRunningApp = nil;
 			for (NSRunningApplication *currApp in [[NSWorkspace sharedWorkspace] runningApplications])
@@ -1185,6 +1192,9 @@
 				if ( contents == nil || [flycutOperator shouldSkip:contents ofType:[capture primaryType] fromAvailableTypes:[capture types]] ) {
                    DLog(@"Contents: Empty or skipped");
                } else {
+                   BOOL enriched = !ownWrite && [self richFormatsAllowedFor:contents] && [capture addRichFormats];
+                   if ( enriched )
+                       contents = [capture text] ?: contents;
                    // A plain-text copy is all in its contents; anything more is kept with it.
                    NSArray *items = [capture onlyPlainText] ? nil : [capture clippingItemsStoredIn:[flycutOperator blobStore]];
                    BOOL described = nil == [capture text];
@@ -1195,6 +1205,12 @@
                    dispatch_async(dispatch_get_main_queue(), ^{
                        if ( ! [pbCount isEqualTo:pbBlockCount] ) {
                            [flycutOperator addClipping:contents ofType:type items:items contentsDescribeItems:described fromApp:[currRunningApp localizedName] withAppBundleURL:currRunningApp.bundleURL.path target:self clippingAddedSelector:@selector(updateMenu)];
+                           // The rich formats go back on the pasteboard too, unless something was copied since.
+                           if ( enriched && [jcPasteboard changeCount] == capturedCount && [capture writeToPasteboard:jcPasteboard] ) {
+                               [self setPBBlockCount:[NSNumber numberWithInt:[jcPasteboard changeCount]]];
+                               [pbCount release];
+                               pbCount = [[NSNumber numberWithInt:[jcPasteboard changeCount]] retain];
+                           }
                        }
                    });
                }
@@ -1726,8 +1742,19 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
     pbBlockCount = newPBBlockCount;
 }
 
+// Rich formats are a preference, and never added to a credential.
+-(BOOL) richFormatsAllowedFor:(NSString *)contents
+{
+	return [[NSUserDefaults standardUserDefaults] boolForKey:@"richClipboardFormats"]
+		&& ![[FlycutCredentialDetector sharedDetector] isCredential:contents];
+}
+
 -(void)addClipToPasteboard:(NSString*)pbFullText
 {
+    if ( [self richFormatsAllowedFor:pbFullText] && FlycutWriteRichMarkdown(pbFullText, jcPasteboard) ) {
+        [self setPBBlockCount:[NSNumber numberWithInt:[jcPasteboard changeCount]]];
+        return;
+    }
     NSArray *pbTypes;
     pbTypes = [NSArray arrayWithObjects:@"NSStringPboardType",NULL];
     

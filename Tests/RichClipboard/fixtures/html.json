@@ -1,0 +1,17 @@
+[
+  {
+    "name": "slack message copy",
+    "html": "<meta charset=\"utf-8\"><div class=\"p-rich_text_section\"><b data-stringify-type=\"bold\">Title:</b> intro with <a target=\"_blank\" class=\"c-link\" data-stringify-link=\"https://example.com/x\" href=\"https://example.com/x\" rel=\"noopener noreferrer\">a link</a> and <code data-stringify-type=\"code\" class=\"c-mrkdwn__code\">code</code><span aria-label=\" \" class=\"c-mrkdwn__br\" data-stringify-type=\"paragraph-break\"></span>second <i data-stringify-type=\"italic\">para</i><br aria-hidden=\"true\">line two</div><ul data-stringify-type=\"unordered-list\" data-list-tree=\"true\" class=\"p-rich_text_list p-rich_text_list__bullet\" data-indent=\"0\" data-border=\"0\"><li data-stringify-indent=\"0\" data-stringify-border=\"0\">parent<ul data-stringify-type=\"unordered-list\" data-list-tree=\"true\" class=\"p-rich_text_list\" data-indent=\"1\" data-border=\"0\"><li data-stringify-indent=\"1\" data-stringify-border=\"0\">child</li></ul></li><li data-stringify-indent=\"0\" data-stringify-border=\"0\">sibling</li></ul><ol data-stringify-type=\"ordered-list\" class=\"p-rich_text_list\" data-indent=\"0\" data-border=\"0\"><li data-stringify-indent=\"0\">first</li><li data-stringify-indent=\"0\">second</li></ol><pre data-stringify-type=\"pre\" class=\"p-rich_text_block\">const x = 1;\nif (a &lt; b) {}\n</pre><blockquote data-stringify-type=\"quote\">\n<div data-slack-paragraph=\"true\">quoted text</div>\n</blockquote><div class=\"p-rich_text_section\"><s data-stringify-type=\"strike\">old</s> end <img data-stringify-type=\"emoji\" data-stringify-emoji=\":tada:\" alt=\"tada\"></div>",
+    "markdown": "**Title:** intro with [a link](https://example.com/x) and `code`\n\nsecond _para_\\\nline two\n\n- parent\n    - child\n- sibling\n\n1. first\n2. second\n\n```\nconst x = 1;\nif (a < b) {}\n```\n\n> quoted text\n\n~~old~~ end :tada:"
+  },
+  {
+    "name": "generic web page",
+    "html": "<html><head><title>x</title><style>p{}</style></head><body><h2>Heading &amp; more</h2><p>Para <strong>bold</strong> <em>em</em>\n  wrapped   text&nbsp;here.</p><p>Second <a href=\"https://e.test/?a=1&amp;b=2\">link</a>.</p><ol><li><p>one</p></li><li>two<ul><li>two-a</li></ul></li></ol><pre><code class=\"language-js\">let a = 1;\nlet b = 2;\n</code></pre><blockquote><p>quote</p></blockquote><script>alert(1)</script><div>div one</div><div>div two</div></body></html>",
+    "markdown": "## Heading & more\n\nPara **bold** _em_ wrapped text here.\n\nSecond [link](https://e.test/?a=1&b=2).\n\n1. one\n2. two\n    - two-a\n\n```\nlet a = 1;\nlet b = 2;\n```\n\n> quote\n\ndiv one\\\ndiv two"
+  },
+  {
+    "name": "google docs wrapper",
+    "html": "<meta charset=\"utf-8\"><b style=\"font-weight:normal;\" id=\"docs-internal-guid-1\"><p dir=\"ltr\"><span style=\"font-weight:700;\">Bold</span><span style=\"font-weight:400;\"> and </span><span style=\"font-style:italic;\">italic</span></p></b>",
+    "markdown": "**Bold** and _italic_"
+  }
+]

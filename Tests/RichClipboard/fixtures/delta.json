@@ -1,0 +1,261 @@
+[
+  {
+    "name": "slack review shape",
+    "delta": {
+      "ops": [
+        {
+          "insert": "Hello team, here is the update with a "
+        },
+        {
+          "attributes": {
+            "link": "https://docs.test/sheet"
+          },
+          "insert": "sheet"
+        },
+        {
+          "insert": ".\n\nThe plan:\n"
+        },
+        {
+          "attributes": {
+            "bold": true
+          },
+          "insert": "First:"
+        },
+        {
+          "insert": " do the thing"
+        },
+        {
+          "attributes": {
+            "list": "ordered"
+          },
+          "insert": "\n"
+        },
+        {
+          "attributes": {
+            "bold": true
+          },
+          "insert": "Second:"
+        },
+        {
+          "insert": " more"
+        },
+        {
+          "attributes": {
+            "list": "ordered"
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "nested a"
+        },
+        {
+          "attributes": {
+            "indent": 1,
+            "list": "bullet"
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "nested b"
+        },
+        {
+          "attributes": {
+            "indent": 1,
+            "list": "bullet"
+          },
+          "insert": "\n"
+        },
+        {
+          "attributes": {
+            "bold": true
+          },
+          "insert": "Third:"
+        },
+        {
+          "insert": " end"
+        },
+        {
+          "attributes": {
+            "list": "ordered"
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "\nThanks "
+        },
+        {
+          "attributes": {
+            "slackslug": "abc"
+          },
+          "insert": "#general"
+        },
+        {
+          "insert": "\nline two"
+        }
+      ]
+    },
+    "markdown": "Hello team, here is the update with a [sheet](https://docs.test/sheet).\n\nThe plan:\n\n1. **First:** do the thing\n2. **Second:** more\n    - nested a\n    - nested b\n3. **Third:** end\n\nThanks #general\\\nline two"
+  },
+  {
+    "name": "code quote emoji",
+    "delta": {
+      "ops": [
+        {
+          "insert": "Look "
+        },
+        {
+          "insert": {
+            "slackemoji": {
+              "name": "eyes",
+              "text": ":eyes:"
+            }
+          }
+        },
+        {
+          "insert": " at "
+        },
+        {
+          "attributes": {
+            "code": true
+          },
+          "insert": "x`y"
+        },
+        {
+          "insert": " and "
+        },
+        {
+          "attributes": {
+            "italic": true,
+            "bold": true
+          },
+          "insert": "both "
+        },
+        {
+          "attributes": {
+            "strike": true
+          },
+          "insert": "gone"
+        },
+        {
+          "insert": "\nconst a = 1;"
+        },
+        {
+          "attributes": {
+            "code-block": true
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "```inner"
+        },
+        {
+          "attributes": {
+            "code-block": true
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "quoted"
+        },
+        {
+          "attributes": {
+            "blockquote": true
+          },
+          "insert": "\n"
+        },
+        {
+          "attributes": {
+            "blockquote": true
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "more quoted"
+        },
+        {
+          "attributes": {
+            "blockquote": true
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "tail\n"
+        }
+      ]
+    },
+    "markdown": "Look :eyes: at ``x`y`` and **_both_** ~~gone~~\n\n````\nconst a = 1;\n```inner\n````\n\n> quoted\n>\n> more quoted\n\ntail"
+  },
+  {
+    "name": "markdown look-alikes",
+    "delta": {
+      "ops": [
+        {
+          "insert": "# not heading\n1. not a list\n- nor this\n2 * 3 = 6, a_b and _c_ [x] ~~y~~ \\ `q` <https://z.test>\n"
+        },
+        {
+          "attributes": {
+            "link": "https://w.test/a_(b)"
+          },
+          "insert": "wiki"
+        },
+        {
+          "insert": " "
+        },
+        {
+          "attributes": {
+            "link": "https://same.test"
+          },
+          "insert": "https://same.test"
+        },
+        {
+          "insert": "\n---\n"
+        }
+      ]
+    },
+    "markdown": "\\# not heading\\\n1\\. not a list\\\n\\- nor this\\\n2 \\* 3 = 6, a_b and \\_c\\_ \\[x\\] \\~\\~y\\~\\~ \\\\ \\`q\\` \\<https://z.test>\\\n[wiki](<https://w.test/a_(b)>) https://same.test\\\n\\---"
+  },
+  {
+    "name": "ordered then bullet same depth",
+    "delta": {
+      "ops": [
+        {
+          "insert": "a"
+        },
+        {
+          "attributes": {
+            "list": "ordered"
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "b"
+        },
+        {
+          "attributes": {
+            "list": "bullet"
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "c"
+        },
+        {
+          "attributes": {
+            "list": "ordered"
+          },
+          "insert": "\n"
+        },
+        {
+          "insert": "d"
+        },
+        {
+          "attributes": {
+            "list": "ordered"
+          },
+          "insert": "\n"
+        }
+      ]
+    },
+    "markdown": "1. a\n- b\n1. c\n2. d"
+  }
+]

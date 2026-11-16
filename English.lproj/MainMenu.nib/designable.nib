@@ -460,8 +460,18 @@
                                                             <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
                                                         </textFieldCell>
                                                     </textField>
+                                                    <button toolTip="Adds HTML and Slack's format to a Markdown copy (its plain text stays the Markdown), and laid-out text and HTML to a copy out of Slack, so pasting keeps lists, bold and links." translatesAutoresizingMaskIntoConstraints="NO" id="rcf-Fm-Btn">
+                                                        <rect key="frame" x="190" y="155" width="301" height="18"/>
+                                                        <buttonCell key="cell" type="check" title="Keep formatting of Markdown and Slack copies" bezelStyle="regularSquare" imagePosition="left" alignment="left" inset="2" id="rcf-Fm-Cel">
+                                                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                                                            <font key="font" metaFont="system"/>
+                                                        </buttonCell>
+                                                        <connections>
+                                                            <binding destination="808" name="value" keyPath="values.richClipboardFormats" id="rcf-Fm-Bnd"/>
+                                                        </connections>
+                                                    </button>
                                                     <button translatesAutoresizingMaskIntoConstraints="NO" id="903">
-                                                        <rect key="frame" x="14" y="155" width="477" height="18"/>
+                                                        <rect key="frame" x="14" y="155" width="170" height="18"/>
                                                         <buttonCell key="cell" type="check" title="Remove duplicates" bezelStyle="regularSquare" imagePosition="left" alignment="left" inset="2" id="904">
                                                             <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
                                                             <font key="font" metaFont="system"/>

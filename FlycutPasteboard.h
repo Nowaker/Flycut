@@ -41,6 +41,16 @@
 // Stores the data and returns the items in FlycutClipping's form, or nil if any of it can't be stored.
 -(NSArray *) clippingItemsStoredIn:(FlycutBlobStore *)store;
 
+// Adds the flavors that keep a Markdown or Slack copy's formatting when pasted (see FlycutRichClipboard.h):
+// HTML and Slack's delta, and for a copy out of Slack laid-out plain text, which then becomes `text`. NO,
+// changing nothing, for a copy that needs none, has more than one item, holds an image, file or other media,
+// is marked concealed, transient or auto-generated, or lost a representation to the size limit (writing it
+// back would lose that from the pasteboard too).
+-(BOOL) addRichFormats;
+
+// Puts the items back on the pasteboard, e.g. after addRichFormats.
+-(BOOL) writeToPasteboard:(NSPasteboard *)pasteboard;
+
 @end
 
 // Describes items holding {"t", "d"} representations, e.g. "[image: GIF, 480×270, 1.1 MB, 20 frames]".
