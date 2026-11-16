@@ -9,6 +9,7 @@
 //	POST /v1/logs/<machine>          append complete lines; 409 with X-Log-Size if X-Log-Offset isn't the current size
 //	PUT  /v1/logs/<machine>          replace the log (after a client compacts it)
 //	/v1/blobs/<machine>/...          pasteboard data the logs refer to (blobs.go)
+//	GET  /v1/archive/search?q=...    search the merged history of every machine (archive.go)
 //	/v1/web/...                      web history sign-in settings (webauth.go)
 //	/web/                            the web history, for a browser (web.go)
 //
@@ -75,6 +76,10 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if rest, ok := strings.CutPrefix(r.URL.Path, "/v1/blobs/"); ok {
 		s.serveBlobs(w, r, rest)
+		return
+	}
+	if rest, ok := strings.CutPrefix(r.URL.Path, "/v1/archive/"); ok {
+		s.serveArchive(w, r, rest)
 		return
 	}
 	rest, ok := strings.CutPrefix(r.URL.Path, "/v1/logs")

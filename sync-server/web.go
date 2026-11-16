@@ -57,6 +57,7 @@ type webClipping struct {
 	Described                             bool
 	Items                                 [][]representation
 	length                                int
+	event                                 json.RawMessage // the put event as stored in its log
 }
 
 func (c *webClipping) credential() bool { return c.Enc != "" }
@@ -141,7 +142,8 @@ func buildIndex(logs []string, open func(string) (string, error)) (*webIndex, er
 			st := &state{at: e.At, machine: e.M}
 			if e.Op == "put" && (e.Contents != nil || e.Enc != "") {
 				c := &webClipping{ID: e.ID, Machine: e.M, App: e.App, Type: e.Type, Enc: e.Enc, List: e.List,
-					At: e.At, Ts: e.Ts, Rank: e.Rank, Described: e.Described, Items: e.Items}
+					At: e.At, Ts: e.Ts, Rank: e.Rank, Described: e.Described, Items: e.Items,
+					event: append(json.RawMessage(nil), scanner.Bytes()...)}
 				if e.Contents != nil {
 					c.Contents = *e.Contents
 				}

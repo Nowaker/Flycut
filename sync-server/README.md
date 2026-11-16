@@ -113,6 +113,7 @@ Every `/v1` request needs `Authorization: Bearer <token>`; `/web/` signs in as d
 | `GET /v1/blobs/<machine>` | `["<sha256>", ...]`, the machine's stored blobs |
 | `GET`/`HEAD /v1/blobs/<machine>/<sha256>` | the blob; 404 if not stored |
 | `PUT /v1/blobs/<machine>/<sha256>` | stores it; 400 unless the body's SHA-256 is the name (up to 256 MB) |
+| `GET /v1/archive/search?q=<words>&list=0\|1&limit=50&offset=0` | `{"matched": N, "clippings": [<put event as stored>, ...]}`: live clippings of every machine, newest rank first, duplicates kept; all words must match contents, app or machine (case-insensitive; sealed text is never searched); `limit` up to 200 |
 | `POST /v1/web/admission` | `{"path": "/web/admit?code=..."}`, a one-time sign-in link for the web history |
 | `GET /v1/web/login` | `{"login": "...", "password": true}` |
 | `PUT`/`DELETE /v1/web/login` | sets (`{"login", "password"}`) or removes the web history password |
