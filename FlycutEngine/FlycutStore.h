@@ -43,7 +43,7 @@ typedef NS_ENUM(int, FlycutHistoryList) {
 - (void)store:(FlycutStore*)store didRemoveClippings:(NSArray*)clippings;
 - (void)storeDidClear:(FlycutStore*)store;
 @optional
-// Removed by local retention (remember limit, age, a duplicate losing to an equal clipping) rather than by the user.
+// Removed by local retention (remember limit, age) or hidden as a duplicate of an equal clipping, rather than by the user.
 - (void)store:(FlycutStore*)store didDropClippings:(NSArray*)clippings;
 @end
 

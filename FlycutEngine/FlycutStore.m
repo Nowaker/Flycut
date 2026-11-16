@@ -111,11 +111,13 @@
 -(void) insertClipping:(FlycutClipping*) clipping atIndex:(int) index{
 	[self delegateBeginUpdates];
 
-	NSMutableArray *removedClippings = [NSMutableArray array];
+	// Hiding duplicates is a display choice: the older copies leave this list but aren't deleted for other
+	// machines, so the sync server keeps every copy with its own time and app.
+	NSMutableArray *duplicateClippings = [NSMutableArray array];
 	int moveFromIndex = -1;
 	if ([jcList containsObject:clipping] && [self removeDuplicates]) {
 		moveFromIndex = (int)[jcList indexOfObject:clipping];
-		[removedClippings addObjectsFromArray:[jcList objectsAtIndexes:[jcList indexesOfObjectsPassingTest:^BOOL(id obj, NSUInteger idx, BOOL *stop) {
+		[duplicateClippings addObjectsFromArray:[jcList objectsAtIndexes:[jcList indexesOfObjectsPassingTest:^BOOL(id obj, NSUInteger idx, BOOL *stop) {
 			return [obj isEqual:clipping];
 		}]]];
         [jcList removeObject:clipping];
@@ -146,7 +148,7 @@
 		[self delegateDeleteClippingAtIndex:(jcRememberNum-1)]; // -1 for before-add indexing
 	}
 
-	[self persistRemovedClippings:removedClippings];
+	[droppedClippings addObjectsFromArray:duplicateClippings];
 	[self persistDroppedClippings:droppedClippings];
 	[self.persistence store:self didSaveClipping:clipping];
 
