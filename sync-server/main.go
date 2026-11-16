@@ -9,10 +9,12 @@
 //	POST /v1/logs/<machine>          append complete lines; 409 with X-Log-Size if X-Log-Offset isn't the current size
 //	PUT  /v1/logs/<machine>          replace the log (after a client compacts it)
 //	/v1/blobs/<machine>/...          pasteboard data the logs refer to (blobs.go)
+//	/v1/web/...                      web history sign-in settings (webauth.go)
+//	/web/                            the web history, for a browser (web.go)
 //
 // Clients seal credential clippings in their logs (seal.go); `flycut-sync-server reveal` reads them back.
 //
-// Every request needs "Authorization: Bearer <token>", the token read from -token-file.
+// Every /v1 request needs "Authorization: Bearer <token>", the token read from -token-file; /web/ has its own sign-in.
 package main
 
 import (
@@ -44,6 +46,9 @@ type server struct {
 	dir   string
 	token []byte
 	mu    sync.Mutex // serializes writes; reads go through the filesystem
+
+	webOnce  sync.Once
+	webState *webApp
 }
 
 func (s *server) path(machine string) string {
@@ -56,8 +61,16 @@ func (s *server) authorized(r *http.Request) bool {
 }
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/" || r.URL.Path == "/web" || strings.HasPrefix(r.URL.Path, "/web/") {
+		s.serveWeb(w, r)
+		return
+	}
 	if !s.authorized(r) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if rest, ok := strings.CutPrefix(r.URL.Path, "/v1/web/"); ok {
+		s.serveWebSettings(w, r, rest)
 		return
 	}
 	if rest, ok := strings.CutPrefix(r.URL.Path, "/v1/blobs/"); ok {

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Flycut history: sign in</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="app.css">
+</head>
+<body class="login">
+<main>
+	<h1>Flycut history</h1>
+	{{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+	{{if .HasPassword}}
+	<form method="post" action="login">
+		<label>Login <input name="login" value="{{.Login}}" autocomplete="username" autocapitalize="off" spellcheck="false"></label>
+		<label>Password <input name="password" type="password" autocomplete="current-password" autofocus required></label>
+		<button type="submit">Sign in</button>
+	</form>
+	<p class="hint">Or open it from Flycut: its menu, Open History in Browser.</p>
+	{{else}}
+	<p>Open it from Flycut: its menu, <strong>Open History in Browser</strong>. That signs this browser in.</p>
+	<p class="hint">To sign in here with a password instead, set one in Flycut's Preferences &gt; History &gt; Browser Login.</p>
+	{{end}}
+</main>
+</body>
+</html>

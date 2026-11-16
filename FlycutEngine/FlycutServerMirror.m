@@ -207,6 +207,83 @@ static NSString *const kUploadStateName = @".upload-state.json";
 	return result;
 }
 
+#pragma mark Web history
+
+// Runs work on the mirror's queue, where request: may block, and hands its error to the main thread.
+-(void) inBackground:(NSString *(^)(void))work then:(void (^)(NSString *error))done
+{
+	[self retain];
+	void (^finish)(NSString *) = [[done copy] autorelease];
+	dispatch_async(queue, ^{
+		NSString *error = nil;
+		@autoreleasepool {
+			error = [work() retain];
+		}
+		dispatch_async(dispatch_get_main_queue(), ^{
+			finish(error);
+			[error release];
+			[self release];
+		});
+	});
+}
+
+-(void) requestWebAdmission:(void (^)(NSURL *link, NSString *error))completion
+{
+	__block NSURL *link = nil;
+	[self inBackground:^NSString *{
+		NSString *error = nil;
+		NSHTTPURLResponse *response = nil;
+		NSData *data = [self request:@"POST" path:@"/v1/web/admission" query:nil body:nil headers:nil response:&response error:&error];
+		if ( error )
+			return error;
+		NSDictionary *answer = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
+		NSString *path = [answer isKindOfClass:[NSDictionary class]] ? [answer objectForKey:@"path"] : nil;
+		if ( [response statusCode] != 200 || ![path isKindOfClass:[NSString class]] || ![path hasPrefix:@"/web/"] )
+			return [NSString stringWithFormat:@"%@ has no web history yet (HTTP %ld); update flycut-sync-server", [serverURL host], (long)[response statusCode]];
+		NSURLComponents *components = [NSURLComponents componentsWithString:path];
+		NSString *base = [[self URLForPath:@"" query:nil] absoluteString];
+		link = [[NSURL URLWithString:[NSString stringWithFormat:@"%@%@?%@", base, [components path], [components percentEncodedQuery]]] retain];
+		return nil;
+	} then:^(NSString *error) {
+		completion([link autorelease], error);
+	}];
+}
+
+-(void) fetchWebLogin:(void (^)(NSString *login, BOOL hasPassword, NSString *error))completion
+{
+	__block NSString *login = nil;
+	__block BOOL hasPassword = NO;
+	[self inBackground:^NSString *{
+		NSString *error = nil;
+		NSHTTPURLResponse *response = nil;
+		NSData *data = [self request:@"GET" path:@"/v1/web/login" query:nil body:nil headers:nil response:&response error:&error];
+		if ( error )
+			return error;
+		NSDictionary *answer = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
+		if ( [response statusCode] != 200 || ![answer isKindOfClass:[NSDictionary class]] )
+			return [NSString stringWithFormat:@"%@ has no web history yet (HTTP %ld); update flycut-sync-server", [serverURL host], (long)[response statusCode]];
+		login = [[answer objectForKey:@"login"] isKindOfClass:[NSString class]] ? [[answer objectForKey:@"login"] copy] : nil;
+		hasPassword = [[answer objectForKey:@"password"] boolValue];
+		return nil;
+	} then:^(NSString *error) {
+		completion([login autorelease], hasPassword, error);
+	}];
+}
+
+-(void) setWebLogin:(NSString *)login password:(NSString *)password completion:(void (^)(NSString *error))completion
+{
+	NSData *body = password ? [NSJSONSerialization dataWithJSONObject:@{@"login": login ?: @"", @"password": password} options:0 error:nil] : nil;
+	[self inBackground:^NSString *{
+		NSString *error = nil;
+		NSHTTPURLResponse *response = nil;
+		[self request:password ? @"PUT" : @"DELETE" path:@"/v1/web/login" query:nil body:body
+			  headers:@{@"Content-Type": @"application/json"} response:&response error:&error];
+		if ( !error && [response statusCode] != 204 )
+			error = [NSString stringWithFormat:@"%@ didn't take it (HTTP %ld)", [serverURL host], (long)[response statusCode]];
+		return error;
+	} then:completion];
+}
+
 static long long LogSize(NSHTTPURLResponse *response)
 {
 	return [[[response allHeaderFields] objectForKey:@"X-Log-Size"] longLongValue];

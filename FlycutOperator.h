@@ -72,6 +72,8 @@
 #ifdef FLYCUT_MAC
 -(FlycutBlobStore *)blobStore;
 -(void)removeUnusedBlobs;
+// The server sync, while history syncs through a server; nil otherwise.
+-(FlycutServerMirror *)serverMirror;
 #endif
 -(bool) saveFromStack;
 -(bool)clearItemAtStackPosition;

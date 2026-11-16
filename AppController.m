@@ -870,6 +870,107 @@
 	[self updateSyncLabels];
 }
 
+// On the Preferences window when it is open, as a window of its own when Flycut is used from the menu.
+-(void) showWebHistoryAlert:(NSAlert *)alert then:(void (^)(NSModalResponse response))handler
+{
+	if ( [prefsPanel isVisible] ) {
+		[alert beginSheetModalForWindow:prefsPanel completionHandler:handler];
+		return;
+	}
+	[NSApp activateIgnoringOtherApps:YES];
+	NSModalResponse response = [alert runModal];
+	if ( handler )
+		handler(response);
+}
+
+-(void) tellWebHistory:(NSString *)message details:(NSString *)details
+{
+	NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+	[alert setMessageText:message];
+	[alert setInformativeText:details ?: @""];
+	[self showWebHistoryAlert:alert then:nil];
+}
+
+-(FlycutServerMirror *) webHistoryMirror
+{
+	FlycutServerMirror *mirror = [flycutOperator serverMirror];
+	if ( !mirror )
+		[self tellWebHistory:@"The web history needs a sync server"
+					 details:@"It is part of flycut-sync-server. Turn on Sync history through a server in Preferences > History."];
+	return mirror;
+}
+
+// The server hands out a link that signs the browser in once, so no password is needed and none is typed.
+-(IBAction) openWebHistory:(id)sender
+{
+	[[self webHistoryMirror] requestWebAdmission:^(NSURL *link, NSString *error) {
+		if ( link )
+			[[NSWorkspace sharedWorkspace] openURL:link];
+		else
+			[self tellWebHistory:@"Can't open the web history" details:error];
+	}];
+}
+
+-(IBAction) editWebLogin:(id)sender
+{
+	FlycutServerMirror *mirror = [self webHistoryMirror];
+	[mirror fetchWebLogin:^(NSString *login, BOOL hasPassword, NSString *error) {
+		if ( error )
+			[self tellWebHistory:@"Can't reach the web history" details:error];
+		else
+			[self askForWebLogin:login hasPassword:hasPassword mirror:mirror];
+	}];
+}
+
+-(void) askForWebLogin:(NSString *)login hasPassword:(BOOL)hasPassword mirror:(FlycutServerMirror *)mirror
+{
+	NSView *fields = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 300, 56)] autorelease];
+	NSTextField *loginField = [[[NSTextField alloc] initWithFrame:NSMakeRect(0, 32, 300, 22)] autorelease];
+	loginField.placeholderString = @"Login (may be left empty)";
+	loginField.stringValue = login ?: @"";
+	NSSecureTextField *passwordField = [[[NSSecureTextField alloc] initWithFrame:NSMakeRect(0, 0, 300, 22)] autorelease];
+	passwordField.placeholderString = hasPassword ? @"New password" : @"Password";
+	[fields addSubview:loginField];
+	[fields addSubview:passwordField];
+
+	NSString *address = [NSString stringWithFormat:@"%@/web/", [[[mirror serverURL] absoluteString] stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"/"]]];
+	NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+	[alert setMessageText:@"Browser Login"];
+	[alert setInformativeText:hasPassword
+		? [NSString stringWithFormat:@"A password signs browsers in at %@. Set a new one, or remove it. Open History in Browser works either way.", address]
+		: [NSString stringWithFormat:@"With a password, any browser on your tailnet can sign in at %@. Without one, only Open History in Browser does, from a Mac running Flycut.", address]];
+	[alert addButtonWithTitle:@"Save"];
+	[alert addButtonWithTitle:@"Cancel"];
+	if ( hasPassword )
+		[alert addButtonWithTitle:@"Remove Password"];
+	[alert setAccessoryView:fields];
+	[[alert window] setInitialFirstResponder:hasPassword ? passwordField : loginField];
+	[self showWebHistoryAlert:alert then:^(NSModalResponse response) {
+		BOOL removing = response == NSAlertThirdButtonReturn;
+		if ( response != NSAlertFirstButtonReturn && !removing )
+			return;
+		NSString *password = removing ? nil : [passwordField stringValue];
+		if ( !removing && [password length] == 0 ) {
+			[self performSelector:@selector(tellWebHistoryNeedsPassword) withObject:nil afterDelay:0];
+			return;
+		}
+		[mirror setWebLogin:[loginField stringValue] password:password completion:^(NSString *error) {
+			if ( error )
+				[self tellWebHistory:@"The login wasn't changed" details:error];
+			else
+				[self tellWebHistory:removing ? @"Password removed" : @"Password saved"
+							 details:removing ? @"Browsers sign in only through Open History in Browser now."
+											  : [NSString stringWithFormat:@"Sign in at %@.", address]];
+		}];
+	}];
+}
+
+// After the sheet that asked for it is gone, since a window takes one sheet at a time.
+-(void) tellWebHistoryNeedsPassword
+{
+	[self tellWebHistory:@"No password entered" details:@"Enter a password to save, or choose Remove Password."];
+}
+
 // macOS 13 dropped the login-item list UKLoginItemRegistry edits; SMAppService registers the app itself.
 // loadOnStartupApplied records what was last applied, so a preference changed while Flycut was quit
 // (defaults write) takes effect at the next launch, while one turned off in System Settings stays off.

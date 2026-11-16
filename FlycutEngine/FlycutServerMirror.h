@@ -32,6 +32,12 @@
 @property (nonatomic, readonly) NSURL *serverURL;
 @property (atomic, readonly) NSString *lastError;	// nil after a round that went through
 
+// The server's web history (/web/). A one-time link that signs a browser in; it works once, within two minutes.
+-(void) requestWebAdmission:(void (^)(NSURL *link, NSString *error))completion;
+// The optional login and password for signing in without Flycut. A nil password removes it.
+-(void) fetchWebLogin:(void (^)(NSString *login, BOOL hasPassword, NSString *error))completion;
+-(void) setWebLogin:(NSString *)login password:(NSString *)password completion:(void (^)(NSString *error))completion;
+
 // Where the local copy of a server's logs is kept for this app.
 +(NSString *) localFolderForServerURL:(NSURL *)serverURL;
 

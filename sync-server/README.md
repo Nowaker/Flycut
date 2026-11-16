@@ -78,9 +78,31 @@ flycut-sync-server reveal -data ... -token-file ... -id <clipping id> -save ~/re
 The first lists sealed clippings (time, id, machine, app, length); the second prints one; the third also writes
 its pasteboard data (HTML, an image) into the directory, one file per representation.
 
+## Web history
+
+`https://<server>/web/` lists every machine's history, merged the way Flycut merges it, with search, a
+machine filter, favorites, image previews and each clipping's formats to download. Duplicates are not
+hidden there: every copy is its own clipping.
+
+Credentials stay masked: the list and the detail never carry their text and search doesn't look inside
+it. **Reveal** fetches one clipping's text (`POST /web/api/reveal`, logged with the clipping id and the
+requester's address); **Hide** takes it out of the page again, and **Copy without showing** puts it on
+the clipboard without displaying it.
+
+Signing in:
+
+- **Open History in Browser**, in Flycut's menu or Preferences > History, asks the server for a one-time
+  link with the token and opens it. The link works once, within two minutes.
+- **Browser Login…** in Preferences > History sets an optional login and password (the login may be
+  empty), stored as PBKDF2-SHA256 in `web-login.json` beside the logs. Without one, the one-time link is
+  the only way in; with one, the link still works. Ten wrong passwords in 15 minutes lock the form for a while.
+
+A session lasts 12 hours. Its cookie is signed with a key derived from the token, so a new token signs
+everyone out.
+
 ## API
 
-Every request needs `Authorization: Bearer <token>`.
+Every `/v1` request needs `Authorization: Bearer <token>`; `/web/` signs in as described above.
 
 | Request | Result |
 |---|---|
@@ -91,3 +113,6 @@ Every request needs `Authorization: Bearer <token>`.
 | `GET /v1/blobs/<machine>` | `["<sha256>", ...]`, the machine's stored blobs |
 | `GET`/`HEAD /v1/blobs/<machine>/<sha256>` | the blob; 404 if not stored |
 | `PUT /v1/blobs/<machine>/<sha256>` | stores it; 400 unless the body's SHA-256 is the name (up to 256 MB) |
+| `POST /v1/web/admission` | `{"path": "/web/admit?code=..."}`, a one-time sign-in link for the web history |
+| `GET /v1/web/login` | `{"login": "...", "password": true}` |
+| `PUT`/`DELETE /v1/web/login` | sets (`{"login", "password"}`) or removes the web history password |

@@ -138,6 +138,8 @@
 -(IBAction) chooseSyncFolder:(id)sender;
 -(IBAction) toggleServerSync:(id)sender;
 -(IBAction) setSyncServer:(id)sender;
+-(IBAction) openWebHistory:(id)sender;
+-(IBAction) editWebLogin:(id)sender;
 -(void) setHotKeyPreferenceForRecorder:(SRRecorderControl *)aRecorder;
 
 @end

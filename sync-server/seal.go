@@ -126,8 +126,10 @@ func saveItems(s *sealer, dataDir, dir string, c sealedClipping) error {
 	return nil
 }
 
+// One of a put event's pasteboard representations: type, blob address, byte count, sealed.
 type representation struct {
 	T, B string
+	N    int64
 	S    bool
 }
 

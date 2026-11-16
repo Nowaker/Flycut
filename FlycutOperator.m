@@ -125,6 +125,11 @@
 	return blobStore;
 }
 
+-(FlycutServerMirror *) serverMirror
+{
+	return serverMirror;
+}
+
 // Data a clipping on its way into a list was just stored for is younger than the grace period.
 -(void) removeUnusedBlobs
 {
