@@ -279,6 +279,22 @@
 	return addresses;
 }
 
+-(BOOL) dropRepresentationsAtAddresses:(NSSet *)addresses
+{
+	if ( ![addresses intersectsSet:[NSSet setWithArray:[self blobAddresses]]] )
+		return NO;
+	NSMutableArray *items = [NSMutableArray array];
+	for ( NSArray *item in clipItems ) {
+		NSIndexSet *kept = [item indexesOfObjectsPassingTest:^BOOL(NSDictionary *representation, NSUInteger index, BOOL *stop) {
+			return ![addresses containsObject:[representation objectForKey:@"b"]];
+		}];
+		if ( [kept count] )
+			[items addObject:[item objectsAtIndexes:kept]];
+	}
+	[self setItems:[items count] ? items : nil];
+	return YES;
+}
+
 // Text clippings are equal when their text is, whatever else they were copied with; clippings that
 // only describe their data (images, files) are equal when that data is.
 - (BOOL)isEqual:(id)other {

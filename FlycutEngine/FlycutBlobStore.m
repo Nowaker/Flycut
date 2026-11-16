@@ -7,6 +7,7 @@
 //
 
 #import "FlycutBlobStore.h"
+#import "FlycutClipping.h"
 #import <CommonCrypto/CommonDigest.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -114,6 +115,97 @@
 			removed++;
 	}
 	return removed;
+}
+
+-(NSDictionary *) sizesByAddress
+{
+	NSMutableDictionary *sizes = [NSMutableDictionary dictionary];
+	NSDirectoryEnumerator *files = [[NSFileManager defaultManager] enumeratorAtURL:[NSURL fileURLWithPath:directory]
+										includingPropertiesForKeys:@[NSURLFileSizeKey]
+														   options:NSDirectoryEnumerationSkipsSubdirectoryDescendants
+													  errorHandler:nil];
+	for ( NSURL *file in files ) {
+		NSString *name = [file lastPathComponent];
+		NSNumber *size = nil;
+		if ( [FlycutBlobStore isAddress:name] && [file getResourceValue:&size forKey:NSURLFileSizeKey error:nil] && size )
+			[sizes setObject:size forKey:name];
+	}
+	return sizes;
+}
+
+-(unsigned long long) removeAddresses:(NSSet *)addresses alsoFromDirectories:(NSArray *)directories
+{
+	unsigned long long freed = 0;
+	for ( NSString *address in addresses ) {
+		NSString *path = [self pathForAddress:address];
+		if ( !path )
+			continue;
+		freed += [[[NSFileManager defaultManager] attributesOfItemAtPath:path error:nil] fileSize];
+		unlink([path fileSystemRepresentation]);
+		for ( NSString *other in directories )
+			unlink([[other stringByAppendingPathComponent:address] fileSystemRepresentation]);
+	}
+	return freed;
+}
+
+static NSTimeInterval const kProtectedAge = 24 * 60 * 60;
+static NSUInteger const kProtectedNewest = 20;
+
+-(NSSet *) addressesToEvictForHistory:(NSArray *)history favorites:(NSArray *)favorites
+								limit:(unsigned long long)limit now:(NSTimeInterval)now evicted:(NSArray **)evicted
+{
+	*evicted = @[];
+	NSDictionary *sizes = [self sizesByAddress];
+	NSMutableSet *used = [NSMutableSet set];
+	for ( NSArray *list in @[history, favorites] )
+		for ( FlycutClipping *clipping in list )
+			[used addObjectsFromArray:[clipping blobAddresses]];
+	unsigned long long total = 0;
+	for ( NSString *address in used )
+		total += [[sizes objectForKey:address] unsignedLongLongValue];
+	if ( total <= limit )
+		return [NSSet set];
+
+	NSMutableSet *kept = [NSMutableSet set];
+	NSMutableArray *candidates = [NSMutableArray array];
+	for ( FlycutClipping *clipping in favorites )
+		[kept addObjectsFromArray:[clipping blobAddresses]];
+	[history enumerateObjectsUsingBlock:^(FlycutClipping *clipping, NSUInteger position, BOOL *stop) {
+		if ( position < kProtectedNewest || [clipping timestamp] >= now - kProtectedAge )
+			[kept addObjectsFromArray:[clipping blobAddresses]];
+		else if ( [[clipping blobAddresses] count] )
+			[candidates addObject:clipping];
+	}];
+
+	NSMutableArray *scored = [NSMutableArray array];
+	for ( FlycutClipping *clipping in candidates ) {
+		unsigned long long bytes = 0;
+		for ( NSString *address in [NSSet setWithArray:[clipping blobAddresses]] )
+			if ( ![kept containsObject:address] )
+				bytes += [[sizes objectForKey:address] unsignedLongLongValue];
+		if ( bytes == 0 )
+			continue;
+		double ageDays = MAX(0, now - [clipping timestamp]) / 86400.0;
+		[scored addObject:@{@"clipping": clipping, @"score": @(bytes * (1 + ageDays / 30))}];
+	}
+	[scored sortUsingDescriptors:@[[NSSortDescriptor sortDescriptorWithKey:@"score" ascending:NO]]];
+
+	unsigned long long target = limit / 10 * 9;
+	NSMutableSet *dropped = [NSMutableSet set];
+	NSMutableArray *losing = [NSMutableArray array];
+	for ( NSDictionary *entry in scored ) {
+		if ( total < target )
+			break;
+		FlycutClipping *clipping = [entry objectForKey:@"clipping"];
+		for ( NSString *address in [clipping blobAddresses] )
+			if ( ![kept containsObject:address] && ![dropped containsObject:address] ) {
+				[dropped addObject:address];
+				total -= MIN(total, [[sizes objectForKey:address] unsignedLongLongValue]);
+			}
+		[losing addObject:clipping];
+	}
+	*evicted = losing;
+	return dropped;
 }
 
 -(void) dealloc

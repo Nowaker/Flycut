@@ -57,6 +57,8 @@ typedef NS_ENUM(int, FlycutCredentialState) {
 // What duplicate removal compares: the text, or for a described clipping, its data.
 -(NSString *) dedupeKey;
 -(NSArray *) blobAddresses;
+// Takes the representations whose data is at those addresses out of the items; YES if any were.
+-(BOOL) dropRepresentationsAtAddresses:(NSSet *)addresses;
 
 -(id) initWithContents:(NSString *)contents withType:(NSString *)type withDisplayLength:(int)displayLength withAppLocalizedName:(NSString *)localizedName withAppBundleURL:(NSString *)bundleURL withTimestamp:(NSInteger)timestamp;
 /* -(id) initWithCoder:(NSCoder *)coder;

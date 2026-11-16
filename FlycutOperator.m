@@ -27,17 +27,21 @@
 @implementation FlycutOperator {
 	NSDateFormatter *dateFormatterForFilename;
 	NSDateFormatter *dateFormatterForDirectory;
+	NSMutableDictionary *restoringData;	// clip id -> blocks waiting for its data to come back from the server
+	BOOL enforcingBinaryLimit;
 }
 
 - (id)init
 {
 	[[NSUserDefaults standardUserDefaults] registerDefaults:[NSDictionary dictionaryWithObjectsAndKeys:
-		[NSNumber numberWithInt:40],
+		[NSNumber numberWithInt:5000],
 		@"rememberNum",
-		[NSNumber numberWithBool:YES],
+		[NSNumber numberWithBool:NO],
 		@"rememberUnlimited",
 		[NSNumber numberWithInt:0],
 		@"historyMaxAgeDays",
+		[NSNumber numberWithInt:512],
+		@"historyBinaryLimitMB",
         [NSNumber numberWithInt:40],
         @"favoritesRememberNum",
 		[NSNumber numberWithInt:1],
@@ -71,6 +75,7 @@
 	settingsSyncList = @[@"rememberNum",
 						 @"rememberUnlimited",
 						 @"historyMaxAgeDays",
+						 @"historyBinaryLimitMB",
 						 @"favoritesRememberNum",
 						 @"savePreference",
 						 @"skipPasswordFields",
@@ -103,6 +108,7 @@
 	[self pruneExpiredClippings];
 #ifdef FLYCUT_MAC
 	[self removeUnusedBlobs];
+	[self enforceBinaryLimit];
 #endif
 	expiryTimer = [[NSTimer scheduledTimerWithTimeInterval:3600
 													 target:self
@@ -116,6 +122,7 @@
 	[self pruneExpiredClippings];
 #ifdef FLYCUT_MAC
 	[self removeUnusedBlobs];
+	[self enforceBinaryLimit];
 #endif
 }
 
@@ -141,6 +148,126 @@
 	NSUInteger removed = [blobStore removeBlobsExcept:used olderThan:600];
 	if ( removed )
 		NSLog(@"Flycut: removed %lu pasteboard data file(s) no clipping uses", (unsigned long)removed);
+}
+
+-(NSSet *) addressesOverBinaryLimit:(NSArray **)evicted
+{
+	unsigned long long limit = (unsigned long long)MAX(1, [[NSUserDefaults standardUserDefaults] integerForKey:@"historyBinaryLimitMB"]) << 20;
+	return [blobStore addressesToEvictForHistory:[[self primaryStore] allClippings] favorites:[favoritesStore allClippings]
+										   limit:limit now:[[NSDate date] timeIntervalSince1970] evicted:evicted];
+}
+
+// Never a delete event: the clippings stay, everywhere. Syncing through a server, only data the server has
+// is dropped, and with it this machine's other local copies (the mirror's, hard links included).
+-(void) enforceBinaryLimit
+{
+	if ( !blobStore || enforcingBinaryLimit )
+		return;
+	NSArray *evicted = nil;
+	NSSet *addresses = [self addressesOverBinaryLimit:&evicted];
+	if ( [addresses count] == 0 )
+		return;
+	if ( !serverMirror ) {
+		[self dropDataAtAddresses:addresses];
+		return;
+	}
+	enforcingBinaryLimit = YES;
+	FlycutServerMirror *mirror = serverMirror;
+	[mirror locateDataOfClippings:evicted completion:^(NSDictionary *sources, NSString *error) {
+		enforcingBinaryLimit = NO;
+		if ( error || mirror != serverMirror ) {
+			if ( error )
+				NSLog(@"Flycut: pasteboard data over the limit stays until the server can be asked about it (%@)", error);
+			return;
+		}
+		NSMutableSet *onServer = [NSMutableSet set];
+		for ( NSDictionary *located in [sources allValues] )
+			[onServer addObjectsFromArray:[located allKeys]];
+		// Taken again: a copy made meanwhile may have made some of the data protected.
+		NSArray *stillEvicted = nil;
+		[onServer intersectSet:[self addressesOverBinaryLimit:&stillEvicted]];
+		[self removeLocalCopiesOfAddresses:onServer];
+	}];
+}
+
+-(void) removeLocalCopiesOfAddresses:(NSSet *)addresses
+{
+	NSMutableArray *mirrorDirectories = [NSMutableArray array];
+	NSString *mirrorBlobs = [[serverMirror localFolder] stringByAppendingPathComponent:@"blobs"];
+	for ( NSString *machine in mirrorBlobs ? [[NSFileManager defaultManager] contentsOfDirectoryAtPath:mirrorBlobs error:nil] : @[] )
+		[mirrorDirectories addObject:[mirrorBlobs stringByAppendingPathComponent:machine]];
+	unsigned long long freed = [blobStore removeAddresses:addresses alsoFromDirectories:mirrorDirectories];
+	if ( [addresses count] )
+		NSLog(@"Flycut: pasteboard data over the limit: dropped %llu MB here (%lu file(s))%@", freed >> 20, (unsigned long)[addresses count],
+			  serverMirror ? @", kept on the server" : @"");
+}
+
+// Without a server to fetch it from again, the data is gone: the clippings lose those representations. Only
+// this machine's database learns of it, so other machines keep theirs.
+-(void) dropDataAtAddresses:(NSSet *)addresses
+{
+	[self removeLocalCopiesOfAddresses:addresses];
+	FlycutStore *history = [self primaryStore];
+	for ( FlycutClipping *clipping in [history allClippings] )
+		if ( [clipping dropRepresentationsAtAddresses:addresses] )
+			[historyDB store:history didSaveClipping:clipping];
+}
+
+-(BOOL) clippingHasDataOnServer:(FlycutClipping *)clipping
+{
+	if ( !serverMirror )
+		return NO;
+	for ( NSString *address in [clipping blobAddresses] )
+		if ( ![blobStore hasAddress:address] )
+			return YES;
+	return NO;
+}
+
+-(BOOL) isRestoringDataOfClipping:(FlycutClipping *)clipping
+{
+	return [clipping clipId] && nil != [restoringData objectForKey:[clipping clipId]];
+}
+
+-(void) restoreDataOfClipping:(FlycutClipping *)clipping completion:(void (^)(void))completion
+{
+	void (^done)(void) = [[(completion ?: ^{}) copy] autorelease];
+	if ( ![self clippingHasDataOnServer:clipping] || ![clipping clipId] ) {
+		done();
+		return;
+	}
+	NSString *clipId = [clipping clipId];
+	NSMutableArray *waiting = [restoringData objectForKey:clipId];
+	if ( waiting ) {
+		[waiting addObject:done];
+		return;
+	}
+	restoringData = restoringData ?: [[NSMutableDictionary alloc] init];
+	[restoringData setObject:[NSMutableArray arrayWithObject:done] forKey:clipId];
+	[serverMirror restoreDataOfClipping:clipping inStore:blobStore completion:^(BOOL complete, NSString *error) {
+		if ( !complete )
+			NSLog(@"Flycut: cannot fetch a clipping's pasteboard data from the server (%@)", error ?: @"the server doesn't have it");
+		NSArray *blocks = [[[restoringData objectForKey:clipId] retain] autorelease];
+		[restoringData removeObjectForKey:clipId];
+		for ( void (^block)(void) in blocks )
+			block();
+	}];
+}
+
+-(void) addArchivedClipping:(FlycutClipping *)clipping fromEvent:(NSDictionary *)event completion:(void (^)(FlycutClipping *added))completion
+{
+	void (^done)(FlycutClipping *) = [[completion copy] autorelease];
+	if ( !serverMirror ) {
+		done(nil);
+		return;
+	}
+	[serverMirror importItemsOfArchiveEvent:event intoStore:blobStore completion:^(NSArray *items, NSString *error) {
+		if ( error )
+			NSLog(@"Flycut: pasting a clipping from the server's archive without some of its data (%@)", error);
+		[self addClipping:[clipping contents] ofType:[clipping type] items:items contentsDescribeItems:[clipping contentsDescribeItems] && [items count]
+				  fromApp:[clipping appLocalizedName] withAppBundleURL:[clipping appBundleURL] target:nil clippingAddedSelector:NULL];
+		FlycutStore *history = [self primaryStore];
+		done([history jcListCount] > 0 ? [history clippingAtPosition:0] : nil);
+	}];
 }
 #endif
 
@@ -923,6 +1050,10 @@
 	stackPosition = 0;
 	[selectorTarget performSelector:clippingAddedSelector];
 	[self actionAfterListModification];
+#ifdef FLYCUT_MAC
+	if ( [items count] )
+		[self enforceBinaryLimit];
+#endif
 	return YES;
 }
 

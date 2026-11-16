@@ -35,4 +35,18 @@
 // is still on its way into a list survives. Returns how many were deleted.
 -(NSUInteger) removeBlobsExcept:(NSSet *)keep olderThan:(NSTimeInterval)minimumAge;
 
+// Every stored blob's size in bytes, by address.
+-(NSDictionary *) sizesByAddress;
+// Deletes the blobs, and files of the same names in the other directories (copies and hard links of them, as in
+// a sync folder), returning how many bytes the store held for them.
+-(unsigned long long) removeAddresses:(NSSet *)addresses alsoFromDirectories:(NSArray *)directories;
+
+// Which data to drop locally when what the clippings use is over limit bytes. Protected are favorites, the
+// 20 newest clippings of history (newest first) and anything copied in the last 24 hours; data a protected
+// clipping uses stays. The others lose their data bulkiest first, by bytes × (1 + age in days / 30), until
+// the total is under 90% of the limit. Returns the addresses to drop; *evicted gets the clippings losing
+// data, in eviction order.
+-(NSSet *) addressesToEvictForHistory:(NSArray *)history favorites:(NSArray *)favorites
+								limit:(unsigned long long)limit now:(NSTimeInterval)now evicted:(NSArray **)evicted;
+
 @end

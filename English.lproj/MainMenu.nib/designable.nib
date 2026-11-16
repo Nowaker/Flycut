@@ -271,7 +271,7 @@
                                                     <textField verticalHuggingPriority="750" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="470">
                                                         <rect key="frame" x="79" y="326" width="34" height="16"/>
                                                         <constraints>
-                                                            <constraint firstAttribute="width" constant="30" id="CUk-dH-iV9"/>
+                                                            <constraint firstAttribute="width" constant="40" id="CUk-dH-iV9"/>
                                                         </constraints>
                                                         <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" sendsActionOnEndEditing="YES" state="on" alignment="right" placeholderString="000" id="758">
                                                             <numberFormatter key="formatter" formatterBehavior="10_0" positiveFormat="#" negativeFormat="-#" hasThousandSeparators="NO" thousandSeparator=" " id="483">
@@ -296,7 +296,7 @@
                                                     </textField>
                                                     <stepper toolTip="Controls how many clippings Flycut stores in its stack" horizontalHuggingPriority="750" verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="472">
                                                         <rect key="frame" x="113" y="320" width="19" height="28"/>
-                                                        <stepperCell key="cell" continuous="YES" alignment="left" minValue="10" maxValue="999" doubleValue="10" valueWraps="YES" id="760"/>
+                                                        <stepperCell key="cell" continuous="YES" alignment="left" minValue="10" maxValue="99999" doubleValue="10" id="760"/>
                                                         <connections>
                                                             <binding destination="808" name="enabled" keyPath="values.rememberUnlimited" id="Hst-en-002">
                                                                 <dictionary key="options">
@@ -655,14 +655,14 @@
                                     <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                     <subviews>
                                         <box fixedFrame="YES" boxType="oldStyle" borderType="none" title="Box" titlePosition="noTitle" translatesAutoresizingMaskIntoConstraints="NO" id="Hst-bx-001">
-                                            <rect key="frame" x="0.0" y="50" width="507" height="470"/>
+                                            <rect key="frame" x="0.0" y="0.0" width="507" height="520"/>
                                             <autoresizingMask key="autoresizingMask"/>
                                             <view key="contentView" id="Hst-cv-001">
-                                                <rect key="frame" x="0.0" y="0.0" width="507" height="470"/>
+                                                <rect key="frame" x="0.0" y="0.0" width="507" height="520"/>
                                                 <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                                 <subviews>
                                                     <button toolTip="Keep every clipping instead of only the most recent ones." fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hst-ul-001">
-                                                        <rect key="frame" x="14" y="434" width="477" height="18"/>
+                                                        <rect key="frame" x="14" y="488" width="477" height="18"/>
                                                         <autoresizingMask key="autoresizingMask"/>
                                                         <buttonCell key="cell" type="check" title="Keep unlimited history" bezelStyle="regularSquare" imagePosition="left" alignment="left" inset="2" id="Hst-uc-001">
                                                             <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
@@ -673,17 +673,51 @@
                                                             <binding destination="808" name="value" keyPath="values.rememberUnlimited" id="Hst-ub-001"/>
                                                         </connections>
                                                     </button>
-                                                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hst-un-001">
-                                                        <rect key="frame" x="32" y="414" width="459" height="16"/>
+                                                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hst-kl-001">
+                                                        <rect key="frame" x="32" y="460" width="170" height="17"/>
                                                         <autoresizingMask key="autoresizingMask"/>
-                                                        <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="When off, the Remember count on the General tab limits the history." id="Hst-uo-001">
-                                                            <font key="font" metaFont="label" size="11"/>
-                                                            <color key="textColor" name="secondaryLabelColor" catalog="System" colorSpace="catalog"/>
+                                                        <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="When off, keep the newest" id="Hst-kc-001">
+                                                            <font key="font" metaFont="system"/>
+                                                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                                                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                                                        </textFieldCell>
+                                                    </textField>
+                                                    <textField toolTip="How many clippings history keeps." verticalHuggingPriority="750" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hst-kf-001">
+                                                        <rect key="frame" x="206" y="458" width="70" height="21"/>
+                                                        <autoresizingMask key="autoresizingMask"/>
+                                                        <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" state="on" borderStyle="bezel" alignment="right" drawsBackground="YES" id="Hst-kg-001">
+                                                            <numberFormatter key="formatter" formatterBehavior="10_0" positiveFormat="#" negativeFormat="-#" hasThousandSeparators="NO" thousandSeparator="," id="Hst-kh-001">
+                                                                <attributedString key="attributedStringForZero">
+                                                                    <fragment content="0"/>
+                                                                </attributedString>
+                                                                <decimal key="minimum" value="1"/>
+                                                                <decimal key="maximum" value="NaN"/>
+                                                            </numberFormatter>
+                                                            <font key="font" metaFont="system"/>
+                                                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                                                            <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                                                        </textFieldCell>
+                                                        <connections>
+                                                            <action selector="setRememberNumPref:" target="213" id="Hst-kf-001-a"/>
+                                                            <binding destination="808" name="enabled" keyPath="values.rememberUnlimited" id="Hst-kn-en">
+                                                                <dictionary key="options">
+                                                                    <string key="NSValueTransformerName">NSNegateBoolean</string>
+                                                                </dictionary>
+                                                            </binding>
+                                                            <binding destination="808" name="value" keyPath="values.rememberNum" id="Hst-kf-001-b"/>
+                                                        </connections>
+                                                    </textField>
+                                                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hst-kd-001">
+                                                        <rect key="frame" x="280" y="460" width="80" height="17"/>
+                                                        <autoresizingMask key="autoresizingMask"/>
+                                                        <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="clippings" id="Hst-ke-001">
+                                                            <font key="font" metaFont="system"/>
+                                                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                                                             <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
                                                         </textFieldCell>
                                                     </textField>
                                                     <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hst-al-001">
-                                                        <rect key="frame" x="14" y="378" width="172" height="17"/>
+                                                        <rect key="frame" x="14" y="428" width="172" height="17"/>
                                                         <autoresizingMask key="autoresizingMask"/>
                                                         <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="Delete clippings older than" id="Hst-ac-001">
                                                             <font key="font" metaFont="system"/>
@@ -692,7 +726,7 @@
                                                         </textFieldCell>
                                                     </textField>
                                                     <textField toolTip="Clippings older than this many days are deleted. 0 keeps them forever." verticalHuggingPriority="750" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hst-af-001">
-                                                        <rect key="frame" x="190" y="376" width="60" height="21"/>
+                                                        <rect key="frame" x="190" y="426" width="60" height="21"/>
                                                         <autoresizingMask key="autoresizingMask"/>
                                                         <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" state="on" borderStyle="bezel" alignment="right" drawsBackground="YES" id="Hst-ag-001">
                                                             <numberFormatter key="formatter" formatterBehavior="10_0" positiveFormat="#" negativeFormat="-#" hasThousandSeparators="NO" thousandSeparator="," id="Hst-ah-001">
@@ -712,7 +746,7 @@
                                                         </connections>
                                                     </textField>
                                                     <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hst-ad-001">
-                                                        <rect key="frame" x="254" y="378" width="60" height="17"/>
+                                                        <rect key="frame" x="254" y="428" width="60" height="17"/>
                                                         <autoresizingMask key="autoresizingMask"/>
                                                         <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="days" id="Hst-ae-001">
                                                             <font key="font" metaFont="system"/>
@@ -721,9 +755,56 @@
                                                         </textFieldCell>
                                                     </textField>
                                                     <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Hst-an-001">
-                                                        <rect key="frame" x="14" y="354" width="477" height="16"/>
+                                                        <rect key="frame" x="14" y="408" width="477" height="16"/>
                                                         <autoresizingMask key="autoresizingMask"/>
                                                         <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="0 keeps clippings forever. Favorites are never deleted by age." id="Hst-ao-001">
+                                                            <font key="font" metaFont="label" size="11"/>
+                                                            <color key="textColor" name="secondaryLabelColor" catalog="System" colorSpace="catalog"/>
+                                                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                                                        </textFieldCell>
+                                                    </textField>
+                                                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Bin-ll-001">
+                                                        <rect key="frame" x="14" y="376" width="172" height="17"/>
+                                                        <autoresizingMask key="autoresizingMask"/>
+                                                        <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="Limit pasteboard data to" id="Bin-lc-001">
+                                                            <font key="font" metaFont="system"/>
+                                                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                                                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                                                        </textFieldCell>
+                                                    </textField>
+                                                    <textField toolTip="Megabytes of images and other pasteboard data history keeps on this Mac." verticalHuggingPriority="750" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Bin-lf-001">
+                                                        <rect key="frame" x="190" y="374" width="60" height="21"/>
+                                                        <autoresizingMask key="autoresizingMask"/>
+                                                        <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" state="on" borderStyle="bezel" alignment="right" drawsBackground="YES" id="Bin-lg-001">
+                                                            <numberFormatter key="formatter" formatterBehavior="10_0" positiveFormat="#" negativeFormat="-#" hasThousandSeparators="NO" thousandSeparator="," id="Bin-lh-001">
+                                                                <attributedString key="attributedStringForZero">
+                                                                    <fragment content="0"/>
+                                                                </attributedString>
+                                                                <decimal key="minimum" value="1"/>
+                                                                <decimal key="maximum" value="NaN"/>
+                                                            </numberFormatter>
+                                                            <font key="font" metaFont="system"/>
+                                                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                                                            <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                                                        </textFieldCell>
+                                                        <connections>
+                                                            <action selector="setHistoryRetentionPref:" target="213" id="Bin-lf-001-a"/>
+                                                            <binding destination="808" name="value" keyPath="values.historyBinaryLimitMB" id="Bin-lf-001-b"/>
+                                                        </connections>
+                                                    </textField>
+                                                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Bin-ld-001">
+                                                        <rect key="frame" x="254" y="376" width="60" height="17"/>
+                                                        <autoresizingMask key="autoresizingMask"/>
+                                                        <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="MB" id="Bin-le-001">
+                                                            <font key="font" metaFont="system"/>
+                                                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                                                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                                                        </textFieldCell>
+                                                    </textField>
+                                                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" allowsCharacterPickerTouchBarItem="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Bin-ln-001">
+                                                        <rect key="frame" x="14" y="330" width="477" height="42"/>
+                                                        <autoresizingMask key="autoresizingMask"/>
+                                                        <textFieldCell key="cell" sendsActionOnEndEditing="YES" title="Over it, older and bulkier copies lose their images and data here first; never favorites, the 20 newest or the last day's copies. Syncing through a server, the data comes back from it when you preview or paste. Without a server, it is gone." id="Bin-nc-001">
                                                             <font key="font" metaFont="label" size="11"/>
                                                             <color key="textColor" name="secondaryLabelColor" catalog="System" colorSpace="catalog"/>
                                                             <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>

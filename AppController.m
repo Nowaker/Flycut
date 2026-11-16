@@ -537,6 +537,7 @@
 {
 	[self checkRememberNumPref:[[NSUserDefaults standardUserDefaults] integerForKey:@"rememberNum"] forPrimaryStore:YES];
 	[flycutOperator pruneExpiredClippings];
+	[flycutOperator enforceBinaryLimit];
 	[self updateMenu];
 }
 
@@ -1034,9 +1035,10 @@
 {
 	FlycutClipping *clipping = [flycutOperator clippingForPasteFromStackPosition];
 	if ( nil != clipping ) {
-		[self putClippingOnPasteboard:clipping];
-		[self performSelector:@selector(hideApp) withObject:nil afterDelay:0.2];
-		[self performSelector:@selector(fakeCommandV) withObject:nil afterDelay:0.2];
+		[self putClippingOnPasteboard:clipping then:^{
+			[self performSelector:@selector(hideApp) withObject:nil afterDelay:0.2];
+			[self performSelector:@selector(fakeCommandV) withObject:nil afterDelay:0.2];
+		}];
 	} else {
 		[self performSelector:@selector(hideApp) withObject:nil afterDelay:0.2];
 	}
@@ -1046,14 +1048,14 @@
 - (void)moveItemAtStackPositionToTopOfStack
 {
 	if ( [flycutOperator stackPositionIsInBounds] ) {
-		[self pasteIndexAndUpdate: [flycutOperator stackPosition]];
+		[self pasteIndexAndUpdate:[flycutOperator stackPosition] then:nil];
 		[self performSelector:@selector(hideApp) withObject:nil afterDelay:0.2];
 	} else {
 		[self performSelector:@selector(hideApp) withObject:nil afterDelay:0.2];
 	}
 }
 
-- (void)pasteIndexAndUpdate:(int) position {
+- (void)pasteIndexAndUpdate:(int) position then:(void (^)(void))afterwards {
     // If there is an active search, we need to map the menu index to the stack position.
     NSString* search = [searchBox stringValue];
     if ( nil != search && 0 != search.length )
@@ -1065,7 +1067,7 @@
     FlycutClipping *clipping = [flycutOperator clippingForPasteFromIndex: position];
     if ( nil != clipping )
     {
-        [self putClippingOnPasteboard:clipping];
+        [self putClippingOnPasteboard:clipping then:afterwards];
         [self updateMenu];
 	}
 }
@@ -1709,12 +1711,12 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 -(IBAction)processMenuClippingSelection:(id)sender
 {
 	int index=[[sender menu] indexOfItem:sender];
-	[self pasteIndexAndUpdate:index];
-
-	if ( [[NSUserDefaults standardUserDefaults] boolForKey:@"menuSelectionPastes"] ) {
+	BOOL pastes = [[NSUserDefaults standardUserDefaults] boolForKey:@"menuSelectionPastes"];
+	if ( pastes )
 		[self performSelector:@selector(hideApp) withObject:nil];
+	[self pasteIndexAndUpdate:index then:pastes ? ^{
 		[self performSelector:@selector(fakeCommandV) withObject:nil afterDelay:0.2];
-	}
+	} : nil];
 }
 
 -(void) setPBBlockCount:(NSNumber *)newPBBlockCount
@@ -1736,12 +1738,19 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 }
 
 // Everything the clipping was copied with, or just its text if that is all it has (or all that's left).
--(void)putClippingOnPasteboard:(FlycutClipping *)clipping
+// Data dropped here for the size limit is fetched back from the server first, then afterwards runs.
+-(void)putClippingOnPasteboard:(FlycutClipping *)clipping then:(void (^)(void))afterwards
 {
-	if ( FlycutWriteClippingItems(clipping, [flycutOperator blobStore], jcPasteboard) )
-		[self setPBBlockCount:[NSNumber numberWithInt:[jcPasteboard changeCount]]];
-	else
-		[self addClipToPasteboard:[clipping contents]];
+	void (^done)(void) = [[afterwards copy] autorelease];
+	[[clipping retain] autorelease];
+	[flycutOperator restoreDataOfClipping:clipping completion:^{
+		if ( FlycutWriteClippingItems(clipping, [flycutOperator blobStore], jcPasteboard) )
+			[self setPBBlockCount:[NSNumber numberWithInt:[jcPasteboard changeCount]]];
+		else
+			[self addClipToPasteboard:[clipping contents]];
+		if ( done )
+			done();
+	}];
 }
 
 -(void) stackDown
@@ -1850,22 +1859,64 @@ didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
 - (void)historyPanel:(HistoryPanel *)panel pasteClipping:(FlycutClipping *)clipping inFavorites:(BOOL)favorites {
 	if ( nil == [flycutOperator pasteContentsOfClipping:clipping inFavorites:favorites] )
 		return;
-	[self putClippingOnPasteboard:clipping];
-	[self updateMenu];
-	// Same as pasting from the bezel: give focus back to the app the user came from before synthesizing Cmd-V.
-	[self performSelector:@selector(hideApp) withObject:nil afterDelay:0.2];
-	[self performSelector:@selector(fakeCommandV) withObject:nil afterDelay:0.2];
+	[self putClippingOnPasteboard:clipping then:^{
+		[self updateMenu];
+		// Same as pasting from the bezel: give focus back to the app the user came from before synthesizing Cmd-V.
+		[self performSelector:@selector(hideApp) withObject:nil afterDelay:0.2];
+		[self performSelector:@selector(fakeCommandV) withObject:nil afterDelay:0.2];
+	}];
 }
 
 - (void)historyPanel:(HistoryPanel *)panel copyClipping:(FlycutClipping *)clipping inFavorites:(BOOL)favorites {
 	if ( nil == [flycutOperator pasteContentsOfClipping:clipping inFavorites:favorites] )
 		return;
-	[self putClippingOnPasteboard:clipping];
-	[self updateMenu];
+	[self putClippingOnPasteboard:clipping then:^{
+		[self updateMenu];
+	}];
 }
 
 - (NSImage *)historyPanel:(HistoryPanel *)panel imageForClipping:(FlycutClipping *)clipping {
-	return FlycutClippingImage(clipping, [flycutOperator blobStore]);
+	NSImage *image = FlycutClippingImage(clipping, [flycutOperator blobStore]);
+	if ( !image && [flycutOperator clippingHasDataOnServer:clipping] && ![flycutOperator isRestoringDataOfClipping:clipping] )
+		[flycutOperator restoreDataOfClipping:clipping completion:^{
+			if ( [historyPanel isVisible] )
+				[historyPanel refreshPreview];
+		}];
+	return image;
+}
+
+- (BOOL)historyPanel:(HistoryPanel *)panel isFetchingDataForClipping:(FlycutClipping *)clipping {
+	return [flycutOperator isRestoringDataOfClipping:clipping];
+}
+
+- (BOOL)historyPanelCanSearchArchive:(HistoryPanel *)panel {
+	return nil != [flycutOperator serverMirror];
+}
+
+- (void)historyPanel:(HistoryPanel *)panel searchArchiveFor:(NSString *)words inFavorites:(BOOL)favorites
+		  completion:(void (^)(NSArray *clippings, NSArray *events, NSUInteger matched, NSString *error))completion {
+	FlycutServerMirror *mirror = [flycutOperator serverMirror];
+	if ( !mirror ) {
+		completion(@[], @[], 0, @"not syncing through a server");
+		return;
+	}
+	[mirror searchArchive:words inList:favorites ? 1 : 0 limit:200 completion:completion];
+}
+
+- (void)historyPanel:(HistoryPanel *)panel chooseArchivedClipping:(FlycutClipping *)clipping event:(NSDictionary *)event paste:(BOOL)paste {
+	[flycutOperator addArchivedClipping:clipping fromEvent:event completion:^(FlycutClipping *added) {
+		if ( !added ) {
+			NSBeep();
+			return;
+		}
+		[self putClippingOnPasteboard:added then:^{
+			[self updateMenu];
+			if ( paste ) {
+				[self performSelector:@selector(hideApp) withObject:nil afterDelay:0.2];
+				[self performSelector:@selector(fakeCommandV) withObject:nil afterDelay:0.2];
+			}
+		}];
+	}];
 }
 
 - (void)historyPanel:(HistoryPanel *)panel deleteClipping:(FlycutClipping *)clipping inFavorites:(BOOL)favorites {

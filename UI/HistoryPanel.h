@@ -23,6 +23,15 @@
 - (void)historyPanel:(HistoryPanel *)panel deleteClipping:(FlycutClipping *)clipping inFavorites:(BOOL)favorites;
 @optional
 - (NSImage *)historyPanel:(HistoryPanel *)panel imageForClipping:(FlycutClipping *)clipping;
+// The clipping's data is being fetched back from the server; the preview says so until refreshPreview.
+- (BOOL)historyPanel:(HistoryPanel *)panel isFetchingDataForClipping:(FlycutClipping *)clipping;
+
+// Searching the server's archive, offered while history syncs through a server. Results are clippings to show,
+// each with the archive event it came from at the same index.
+- (BOOL)historyPanelCanSearchArchive:(HistoryPanel *)panel;
+- (void)historyPanel:(HistoryPanel *)panel searchArchiveFor:(NSString *)words inFavorites:(BOOL)favorites
+		  completion:(void (^)(NSArray *clippings, NSArray *events, NSUInteger matched, NSString *error))completion;
+- (void)historyPanel:(HistoryPanel *)panel chooseArchivedClipping:(FlycutClipping *)clipping event:(NSDictionary *)event paste:(BOOL)paste;
 @end
 
 @interface HistoryPanel : NSPanel <NSTableViewDataSource, NSTableViewDelegate, NSSearchFieldDelegate, NSWindowDelegate>
@@ -38,6 +47,7 @@
 - (void)showOnActiveScreen;
 - (void)dismiss;
 - (void)reloadClippings;
+- (void)refreshPreview;
 - (void)selectNext;
 - (void)selectPrevious;
 

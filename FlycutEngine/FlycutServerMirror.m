@@ -9,6 +9,8 @@
 #import "FlycutServerMirror.h"
 #import "FlycutFolderSync.h"
 #import "FlycutBlobStore.h"
+#import "FlycutClipping.h"
+#import "FlycutSyncCrypto.h"
 #import <Security/Security.h>
 #include <sys/stat.h>
 #include <netdb.h>
@@ -165,8 +167,20 @@ static NSString *const kUploadStateName = @".upload-state.json";
 	if ( [base hasSuffix:@"/"] )
 		base = [base substringToIndex:[base length] - 1];
 	components.path = [base stringByAppendingString:path];
-	components.query = query;
+	components.percentEncodedQuery = query;
 	return [components URL];
+}
+
+// Percent-encoded, '+' included: the server reads it as a space otherwise.
+static NSString *QueryString(NSDictionary *parameters)
+{
+	NSMutableCharacterSet *allowed = [[[NSCharacterSet URLQueryAllowedCharacterSet] mutableCopy] autorelease];
+	[allowed removeCharactersInString:@"&=+#?"];
+	NSMutableArray *pairs = [NSMutableArray array];
+	for ( NSString *name in [[parameters allKeys] sortedArrayUsingSelector:@selector(compare:)] )
+		[pairs addObject:[NSString stringWithFormat:@"%@=%@", name,
+						  [[[parameters objectForKey:name] description] stringByAddingPercentEncodingWithAllowedCharacters:allowed]]];
+	return [pairs componentsJoinedByString:@"&"];
 }
 
 // Synchronous, on the mirror's own queue.
@@ -282,6 +296,274 @@ static NSString *const kUploadStateName = @".upload-state.json";
 			error = [NSString stringWithFormat:@"%@ didn't take it (HTTP %ld)", [serverURL host], (long)[response statusCode]];
 		return error;
 	} then:completion];
+}
+
+#pragma mark Archive
+
+static NSString *StringIn(NSDictionary *dictionary, NSString *key)
+{
+	id value = [dictionary isKindOfClass:[NSDictionary class]] ? [dictionary objectForKey:key] : nil;
+	return [value isKindOfClass:[NSString class]] ? value : nil;
+}
+
+static BOOL IsMachineName(NSString *machine)
+{
+	return [machine length] > 0 && ![machine containsString:@"/"] && ![machine hasPrefix:@"."];
+}
+
+-(FlycutSyncCrypto *) crypto
+{
+	return [[[FlycutSyncCrypto alloc] initWithToken:token] autorelease];
+}
+
+-(FlycutClipping *) clippingFromArchiveEvent:(NSDictionary *)event crypto:(FlycutSyncCrypto *)crypto
+{
+	NSString *contents = StringIn(event, @"contents");
+	if ( !contents && StringIn(event, @"enc") )
+		contents = [crypto open:StringIn(event, @"enc")];
+	if ( [contents length] == 0 || [StringIn(event, @"id") length] == 0 )
+		return nil;
+	FlycutClipping *clipping = [[[FlycutClipping alloc] initWithContents:contents withType:StringIn(event, @"type") withDisplayLength:40
+													withAppLocalizedName:StringIn(event, @"app") withAppBundleURL:StringIn(event, @"appPath")
+														   withTimestamp:[[event objectForKey:@"ts"] integerValue]] autorelease];
+	[clipping setClipId:StringIn(event, @"id")];
+	[clipping setRank:[[event objectForKey:@"rank"] doubleValue]];
+	[clipping setContentsDescribeItems:[[event objectForKey:@"described"] boolValue]];
+	return clipping;
+}
+
+-(void) searchArchive:(NSString *)words inList:(int)list limit:(NSUInteger)limit
+		   completion:(void (^)(NSArray *clippings, NSArray *events, NSUInteger matched, NSString *error))completion
+{
+	NSString *query = QueryString(@{@"q": words ?: @"", @"list": @(list), @"limit": @(limit)});
+	NSMutableArray *clippings = [NSMutableArray array], *events = [NSMutableArray array];
+	__block NSUInteger matched = 0;
+	[self inBackground:^NSString *{
+		NSString *error = nil;
+		NSHTTPURLResponse *response = nil;
+		NSData *data = [self request:@"GET" path:@"/v1/archive/search" query:query body:nil headers:nil response:&response error:&error];
+		if ( error )
+			return error;
+		NSDictionary *answer = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
+		NSArray *found = [answer isKindOfClass:[NSDictionary class]] ? [answer objectForKey:@"clippings"] : nil;
+		if ( [response statusCode] != 200 || ![found isKindOfClass:[NSArray class]] )
+			return [NSString stringWithFormat:@"%@ can't search its archive (HTTP %ld); update flycut-sync-server", [serverURL host], (long)[response statusCode]];
+		FlycutSyncCrypto *crypto = [self crypto];
+		for ( NSDictionary *event in found ) {
+			FlycutClipping *clipping = [self clippingFromArchiveEvent:event crypto:crypto];
+			if ( !clipping )
+				continue;	// sealed with another token
+			[clippings addObject:clipping];
+			[events addObject:event];
+		}
+		matched = [[answer objectForKey:@"matched"] unsignedIntegerValue];
+		return nil;
+	} then:^(NSString *error) {
+		completion(clippings, events, matched, error);
+	}];
+}
+
+// The blob, checked against its address; nil without an error when the server doesn't have it.
+-(NSData *) blobOf:(NSString *)machine address:(NSString *)address error:(NSString **)errorOut
+{
+	NSHTTPURLResponse *response = nil;
+	NSData *data = [self request:@"GET" path:[self blobPathOf:machine address:address] query:nil body:nil headers:nil response:&response error:errorOut];
+	if ( *errorOut || [response statusCode] == 404 )
+		return nil;
+	if ( [response statusCode] != 200 || !data || ![[FlycutBlobStore addressOfData:data] isEqualToString:address] ) {
+		*errorOut = [NSString stringWithFormat:@"cannot download pasteboard data from %@ (HTTP %ld)", [serverURL host], (long)[response statusCode]];
+		return nil;
+	}
+	return data;
+}
+
+-(void) importItemsOfArchiveEvent:(NSDictionary *)event intoStore:(FlycutBlobStore *)store
+					   completion:(void (^)(NSArray *items, NSString *error))completion
+{
+	NSMutableArray *items = [NSMutableArray array];
+	[self inBackground:^NSString *{
+		NSString *machine = StringIn(event, @"m");
+		NSArray *eventItems = [event objectForKey:@"items"];
+		if ( !IsMachineName(machine) || ![eventItems isKindOfClass:[NSArray class]] )
+			return nil;
+		FlycutSyncCrypto *crypto = [self crypto];
+		for ( NSArray *eventItem in eventItems ) {
+			if ( ![eventItem isKindOfClass:[NSArray class]] )
+				continue;
+			NSMutableArray *item = [NSMutableArray array];
+			for ( NSDictionary *representation in eventItem ) {
+				NSString *type = StringIn(representation, @"t"), *address = StringIn(representation, @"b");
+				if ( !type || ![FlycutBlobStore isAddress:address] )
+					continue;
+				NSString *error = nil;
+				NSData *data = [self blobOf:machine address:address error:&error];
+				if ( error )
+					return error;
+				if ( data && [[representation objectForKey:@"s"] boolValue] )
+					data = [crypto openData:data];
+				NSString *local = data ? [store storeData:data] : nil;
+				if ( local )
+					[item addObject:@{@"t": type, @"b": local, @"n": @([data length])}];
+			}
+			if ( [item count] )
+				[items addObject:item];
+		}
+		return nil;
+	} then:^(NSString *error) {
+		completion([items count] ? items : nil, error);
+	}];
+}
+
+// The newest put event with items of each of the clipping ids, in the local copies of every machine's log.
+-(NSDictionary *) newestPutEventsOfIds:(NSSet *)ids
+{
+	NSMutableDictionary *found = [NSMutableDictionary dictionary];
+	NSData *itemsKey = [@"\"items\"" dataUsingEncoding:NSUTF8StringEncoding];
+	for ( NSString *name in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:localFolder error:nil] ) {
+		if ( [name hasPrefix:@"."] || ![[name pathExtension] isEqualToString:@"jsonl"] )
+			continue;
+		NSData *log = [NSData dataWithContentsOfFile:[localFolder stringByAppendingPathComponent:name] options:NSDataReadingMappedIfSafe error:nil];
+		const char *bytes = [log bytes];
+		NSUInteger lineStart = 0, length = [log length];
+		for ( NSUInteger i = 0; i < length; i++ ) {
+			if ( bytes[i] != '\n' )
+				continue;
+			NSData *line = [NSData dataWithBytesNoCopy:(void *)(bytes + lineStart) length:i - lineStart freeWhenDone:NO];
+			lineStart = i + 1;
+			if ( [line rangeOfData:itemsKey options:0 range:NSMakeRange(0, [line length])].location == NSNotFound )
+				continue;
+			NSDictionary *event = [NSJSONSerialization JSONObjectWithData:line options:0 error:nil];
+			NSString *clipId = StringIn(event, @"id");
+			if ( !clipId || ![ids containsObject:clipId] || ![StringIn(event, @"op") isEqualToString:@"put"] )
+				continue;
+			NSDictionary *existing = [found objectForKey:clipId];
+			long long at = [[event objectForKey:@"at"] longLongValue], existingAt = [[existing objectForKey:@"at"] longLongValue];
+			if ( !existing || at > existingAt || (at == existingAt && [StringIn(event, @"m") compare:StringIn(existing, @"m") ?: @""] == NSOrderedDescending) )
+				[found setObject:event forKey:clipId];
+		}
+	}
+	return found;
+}
+
+// The representation of an event that holds a local representation's data: the same data, or sealed data of
+// the same type (preferably in the same item), which only opening it can confirm.
+static NSDictionary *SourceInEvent(NSString *address, NSString *type, NSUInteger itemIndex, NSArray *eventItems)
+{
+	NSDictionary *sealed = nil;
+	for ( NSUInteger i = 0; i < [eventItems count]; i++ ) {
+		NSArray *item = [eventItems objectAtIndex:i];
+		if ( ![item isKindOfClass:[NSArray class]] )
+			continue;
+		for ( NSDictionary *representation in item ) {
+			NSString *remote = StringIn(representation, @"b");
+			if ( ![FlycutBlobStore isAddress:remote] || ![StringIn(representation, @"t") isEqualToString:type] )
+				continue;
+			if ( ![[representation objectForKey:@"s"] boolValue] ) {
+				if ( [remote isEqualToString:address] )
+					return @{@"b": remote};
+			} else if ( !sealed || i == itemIndex )
+				sealed = @{@"b": remote, @"s": @YES};
+		}
+	}
+	return sealed;
+}
+
+// Snapshots are {"id", "items"}, taken on the main thread.
+-(NSDictionary *) sourcesForSnapshots:(NSArray *)snapshots error:(NSString **)errorOut
+{
+	NSDictionary *events = [self newestPutEventsOfIds:[NSSet setWithArray:[snapshots valueForKey:@"id"]]];
+	NSMutableDictionary *held = [NSMutableDictionary dictionary];
+	NSMutableDictionary *sources = [NSMutableDictionary dictionary];
+	for ( NSDictionary *snapshot in snapshots ) {
+		NSDictionary *event = [events objectForKey:[snapshot objectForKey:@"id"]];
+		NSString *machine = StringIn(event, @"m");
+		if ( !IsMachineName(machine) )
+			continue;
+		NSSet *onServer = [held objectForKey:machine];
+		if ( !onServer ) {
+			NSHTTPURLResponse *response = nil;
+			NSData *listing = [self request:@"GET" path:[@"/v1/blobs/" stringByAppendingString:machine] query:nil body:nil headers:nil response:&response error:errorOut];
+			if ( *errorOut )
+				return nil;
+			NSArray *addresses = listing ? [NSJSONSerialization JSONObjectWithData:listing options:0 error:nil] : nil;
+			onServer = [addresses isKindOfClass:[NSArray class]] && [response statusCode] == 200 ? [NSSet setWithArray:addresses] : [NSSet set];
+			[held setObject:onServer forKey:machine];
+		}
+		NSMutableDictionary *found = [NSMutableDictionary dictionary];
+		[[snapshot objectForKey:@"items"] enumerateObjectsUsingBlock:^(NSArray *item, NSUInteger index, BOOL *stop) {
+			for ( NSDictionary *representation in item ) {
+				NSString *address = [representation objectForKey:@"b"];
+				NSDictionary *source = SourceInEvent(address, [representation objectForKey:@"t"], index, [event objectForKey:@"items"]);
+				if ( source && [onServer containsObject:[source objectForKey:@"b"]] ) {
+					NSMutableDictionary *located = [[source mutableCopy] autorelease];
+					[located setObject:machine forKey:@"m"];
+					[found setObject:located forKey:address];
+				}
+			}
+		}];
+		if ( [found count] )
+			[sources setObject:found forKey:[snapshot objectForKey:@"id"]];
+	}
+	return sources;
+}
+
+static NSArray *Snapshots(NSArray *clippings)
+{
+	NSMutableArray *snapshots = [NSMutableArray arrayWithCapacity:[clippings count]];
+	for ( FlycutClipping *clipping in clippings )
+		if ( [clipping clipId] && [[clipping items] count] )
+			[snapshots addObject:@{@"id": [clipping clipId], @"items": [clipping items]}];
+	return snapshots;
+}
+
+-(void) locateDataOfClippings:(NSArray *)clippings completion:(void (^)(NSDictionary *sources, NSString *error))completion
+{
+	NSArray *snapshots = Snapshots(clippings);
+	__block NSDictionary *sources = nil;
+	[self inBackground:^NSString *{
+		NSString *error = nil;
+		sources = [[self sourcesForSnapshots:snapshots error:&error] retain];
+		return error;
+	} then:^(NSString *error) {
+		completion([sources autorelease] ?: @{}, error);
+	}];
+}
+
+-(void) restoreDataOfClipping:(FlycutClipping *)clipping inStore:(FlycutBlobStore *)store
+				   completion:(void (^)(BOOL complete, NSString *error))completion
+{
+	NSArray *snapshots = Snapshots(@[clipping]);
+	__block BOOL complete = NO;
+	[self inBackground:^NSString *{
+		NSMutableSet *missing = [NSMutableSet set];
+		for ( NSArray *item in [[snapshots firstObject] objectForKey:@"items"] )
+			for ( NSDictionary *representation in item )
+				if ( ![store hasAddress:[representation objectForKey:@"b"]] )
+					[missing addObject:[representation objectForKey:@"b"]];
+		if ( [missing count] == 0 ) {
+			complete = YES;
+			return nil;
+		}
+		NSString *error = nil;
+		NSDictionary *sources = [[self sourcesForSnapshots:snapshots error:&error] objectForKey:[[snapshots firstObject] objectForKey:@"id"]];
+		if ( error )
+			return error;
+		FlycutSyncCrypto *crypto = [self crypto];
+		for ( NSString *address in [[missing copy] autorelease] ) {
+			NSDictionary *source = [sources objectForKey:address];
+			NSData *data = source ? [self blobOf:[source objectForKey:@"m"] address:[source objectForKey:@"b"] error:&error] : nil;
+			if ( error )
+				return error;
+			if ( data && [[source objectForKey:@"s"] boolValue] )
+				data = [crypto openData:data];
+			if ( data && [[FlycutBlobStore addressOfData:data] isEqualToString:address] && [store storeData:data] )
+				[missing removeObject:address];
+		}
+		complete = [missing count] == 0;
+		return nil;
+	} then:^(NSString *error) {
+		completion(complete, error);
+	}];
 }
 
 static long long LogSize(NSHTTPURLResponse *response)

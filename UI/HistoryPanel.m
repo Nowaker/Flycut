@@ -37,6 +37,15 @@ static NSString * const kCellIdentifier = @"HistoryPanelClipping";
 	BOOL showsFavorites;
 	NSMutableDictionary *iconCache;
 	NSDateFormatter *dateFormatter;
+
+	// The last row offers the server's archive while searching; once searched it heads the server's results.
+	BOOL showsArchiveRow;
+	NSString *archiveWords;					// the search the archive results are for
+	NSArray *archiveClippings, *archiveEvents;	// as the server answered
+	NSArray *serverClippings, *serverEvents;	// those not listed locally above
+	NSUInteger archiveMatched;
+	NSString *archiveError;
+	BOOL archiveSearching, archiveSearched;
 }
 
 - (instancetype)initWithHistoryDelegate:(id<HistoryPanelDelegate>)delegate
@@ -123,6 +132,7 @@ static NSString * const kCellIdentifier = @"HistoryPanelClipping";
 	table.dataSource = self;
 	table.delegate = self;
 	table.target = self;
+	table.action = @selector(tableClicked:);
 	table.doubleAction = @selector(tableDoubleClicked:);
 
 	NSScrollView *tableScroll = [[[NSScrollView alloc] initWithFrame:NSMakeRect(kMargin, listBottom, listWidth, listHeight)] autorelease];
@@ -214,6 +224,7 @@ static NSString * const kCellIdentifier = @"HistoryPanelClipping";
 - (void)setShowsFavorites:(BOOL)favorites
 {
 	showsFavorites = favorites;
+	[self resetArchive];
 	[listSwitch setSelectedSegment:favorites ? 1 : 0];
 	[self reloadClippingsSelectingFirst:YES];
 	[self makeFirstResponder:searchField];
@@ -234,10 +245,119 @@ static NSString * const kCellIdentifier = @"HistoryPanelClipping";
 	[self applyFilterSelectingFirst:selectFirst];
 }
 
+#pragma mark Rows: local matches, then the archive row and the server's results
+
+- (NSInteger)archiveRow
+{
+	return showsArchiveRow ? (NSInteger)[shownClippings count] : -1;
+}
+
+- (NSInteger)rowCount
+{
+	return [shownClippings count] + (showsArchiveRow ? 1 + [serverClippings count] : 0);
+}
+
+- (NSInteger)serverIndexOfRow:(NSInteger)row
+{
+	NSInteger index = row - [self archiveRow] - 1;
+	return showsArchiveRow && index >= 0 && index < (NSInteger)[serverClippings count] ? index : -1;
+}
+
+- (FlycutClipping *)clippingAtRow:(NSInteger)row
+{
+	if ( row >= 0 && row < (NSInteger)[shownClippings count] )
+		return [shownClippings objectAtIndex:row];
+	NSInteger index = [self serverIndexOfRow:row];
+	return index >= 0 ? [serverClippings objectAtIndex:index] : nil;
+}
+
+- (NSDictionary *)archiveEventAtRow:(NSInteger)row
+{
+	NSInteger index = [self serverIndexOfRow:row];
+	return index >= 0 ? [serverEvents objectAtIndex:index] : nil;
+}
+
+// Once searched, the archive row only heads the results.
+- (BOOL)isSelectableRow:(NSInteger)row
+{
+	return row != [self archiveRow] || !archiveSearched;
+}
+
 - (FlycutClipping *)selectedClipping
+{
+	return [self clippingAtRow:[table selectedRow]];
+}
+
+- (FlycutClipping *)selectedLocalClipping
 {
 	NSInteger row = [table selectedRow];
 	return row >= 0 && row < (NSInteger)[shownClippings count] ? [shownClippings objectAtIndex:row] : nil;
+}
+
+- (BOOL)offersArchive
+{
+	return [[searchField stringValue] length] > 0 && [self.historyDelegate respondsToSelector:@selector(historyPanelCanSearchArchive:)]
+		&& [self.historyDelegate historyPanelCanSearchArchive:self];
+}
+
+- (void)resetArchive
+{
+	[archiveWords release];
+	[archiveClippings release];
+	[archiveEvents release];
+	[serverClippings release];
+	[serverEvents release];
+	[archiveError release];
+	archiveWords = nil;
+	archiveClippings = archiveEvents = serverClippings = serverEvents = nil;
+	archiveError = nil;
+	archiveMatched = 0;
+	archiveSearching = archiveSearched = NO;
+}
+
+// The server's results minus the clippings already listed locally.
+- (void)filterArchiveResults
+{
+	NSSet *localIds = [NSSet setWithArray:[shownClippings valueForKey:@"clipId"]];
+	NSMutableArray *clippings = [NSMutableArray array], *events = [NSMutableArray array];
+	[archiveClippings enumerateObjectsUsingBlock:^(FlycutClipping *clipping, NSUInteger index, BOOL *stop) {
+		if ( [localIds containsObject:[clipping clipId]] )
+			return;
+		[clippings addObject:clipping];
+		[events addObject:[archiveEvents objectAtIndex:index]];
+	}];
+	[serverClippings release];
+	[serverEvents release];
+	serverClippings = [clippings retain];
+	serverEvents = [events retain];
+}
+
+- (void)searchArchive
+{
+	if ( archiveSearching || archiveSearched || ![self offersArchive] )
+		return;
+	NSString *words = [[[searchField stringValue] copy] autorelease];
+	[self resetArchive];
+	archiveWords = [words copy];
+	archiveSearching = YES;
+	[self applyFilterSelectingFirst:NO];
+	[self.historyDelegate historyPanel:self searchArchiveFor:words inFavorites:showsFavorites
+							completion:^(NSArray *clippings, NSArray *events, NSUInteger matched, NSString *error) {
+		if ( !archiveSearching || ![archiveWords isEqualToString:words] )
+			return;	// the search changed meanwhile
+		archiveSearching = NO;
+		if ( error )
+			archiveError = [error copy];
+		else {
+			archiveSearched = YES;
+			archiveClippings = [clippings copy];
+			archiveEvents = [events copy];
+			archiveMatched = matched;
+		}
+		[self applyFilterSelectingFirst:NO];
+		if ( archiveSearched && [serverClippings count] )
+			[self selectRow:[self archiveRow] + 1];
+	}];
 }
 
 // Letters with a stroke or bar have no Unicode decomposition, so diacritic-insensitive search leaves them
@@ -285,15 +405,24 @@ static NSString *FoldUndecomposableLetters(NSString *string)
 {
 	FlycutClipping *previouslySelected = [[[self selectedClipping] retain] autorelease];
 	NSInteger previousRow = [table selectedRow];
+	BOOL archiveRowWasSelected = previousRow >= 0 && previousRow == [self archiveRow];
 
+	NSString *search = [searchField stringValue];
+	if ( archiveWords && ![archiveWords isEqualToString:search] )
+		[self resetArchive];
 	[shownClippings release];
-	shownClippings = [[self clippingsMatching:[searchField stringValue]] retain];
+	shownClippings = [[self clippingsMatching:search] retain];
+	showsArchiveRow = [self offersArchive];
+	[self filterArchiveResults];
 	[table reloadData];
 
 	NSInteger row = 0;
-	if ( !selectFirst && previouslySelected ) {
-		NSUInteger kept = [shownClippings indexOfObjectIdenticalTo:previouslySelected];
-		row = NSNotFound != kept ? (NSInteger)kept : MAX(previousRow, 0);
+	if ( !selectFirst && archiveRowWasSelected )
+		row = [self archiveRow];
+	else if ( !selectFirst && previouslySelected ) {
+		NSUInteger local = [shownClippings indexOfObjectIdenticalTo:previouslySelected];
+		NSUInteger server = [serverClippings indexOfObjectIdenticalTo:previouslySelected];
+		row = NSNotFound != local ? (NSInteger)local : NSNotFound != server ? [self archiveRow] + 1 + (NSInteger)server : MAX(previousRow, 0);
 	}
 	[self selectRow:row];
 	[self updateStatus];
@@ -301,13 +430,26 @@ static NSString *FoldUndecomposableLetters(NSString *string)
 
 - (void)selectRow:(NSInteger)row
 {
-	NSInteger count = [shownClippings count];
+	[self selectRow:row towards:1];
+}
+
+// A row that can't be selected passes the selection on in the direction it was moving.
+- (void)selectRow:(NSInteger)row towards:(NSInteger)direction
+{
+	NSInteger count = [self rowCount];
 	if ( count == 0 ) {
 		[table deselectAll:nil];
 		[self updatePreview];
 		return;
 	}
 	row = MAX(0, MIN(row, count - 1));
+	if ( ![self isSelectableRow:row] )
+		row = row + direction >= 0 && row + direction < count ? row + direction : row - direction;
+	if ( row < 0 || row >= count || ![self isSelectableRow:row] ) {
+		[table deselectAll:nil];
+		[self updatePreview];
+		return;
+	}
 	[table selectRowIndexes:[NSIndexSet indexSetWithIndex:row] byExtendingSelection:NO];
 	[table scrollRowToVisible:row];
 }
@@ -315,7 +457,7 @@ static NSString *FoldUndecomposableLetters(NSString *string)
 - (void)moveSelectionBy:(NSInteger)delta
 {
 	NSInteger row = [table selectedRow];
-	[self selectRow:row < 0 ? 0 : row + delta];
+	[self selectRow:row < 0 ? 0 : row + delta towards:delta < 0 ? -1 : 1];
 }
 
 - (void)selectNext
@@ -346,15 +488,29 @@ static NSString *FoldUndecomposableLetters(NSString *string)
 		attachment.bounds = NSMakeRect(0, 0, width, width * image.size.height / image.size.width);
 		[[preview textStorage] appendAttributedString:[[[NSAttributedString alloc] initWithString:@"\n\n"] autorelease]];
 		[[preview textStorage] appendAttributedString:[NSAttributedString attributedStringWithAttachment:attachment]];
+	} else if ( [clipping items] && [self.historyDelegate respondsToSelector:@selector(historyPanel:isFetchingDataForClipping:)]
+			   && [self.historyDelegate historyPanel:self isFetchingDataForClipping:clipping] ) {
+		NSDictionary *note = @{NSForegroundColorAttributeName: [NSColor secondaryLabelColor], NSFontAttributeName: [NSFont systemFontOfSize:12]};
+		[[preview textStorage] appendAttributedString:[[[NSAttributedString alloc] initWithString:@"\n\n☁︎ Fetching its data from the server…" attributes:note] autorelease]];
 	}
 	[preview scrollRangeToVisible:NSMakeRange(0, 0)];
+}
+
+- (void)refreshPreview
+{
+	[self updatePreview];
 }
 
 - (void)updateStatus
 {
 	NSString *count = [shownClippings count] == [allClippings count]
 		? [NSString stringWithFormat:@"%lu clippings", (unsigned long)[allClippings count]]
-		: [NSString stringWithFormat:@"%lu of %lu clippings", (unsigned long)[shownClippings count], (unsigned long)[allClippings count]];
+		: [NSString stringWithFormat:@"%lu of %lu clippings matched locally", (unsigned long)[shownClippings count], (unsigned long)[allClippings count]];
+	if ( archiveSearched && [archiveClippings count] < archiveMatched )
+		count = [count stringByAppendingFormat:@" · %lu more on server (newest %lu of %lu matches)", (unsigned long)[serverClippings count],
+				 (unsigned long)[archiveClippings count], (unsigned long)archiveMatched];
+	else if ( archiveSearched )
+		count = [count stringByAppendingFormat:@" · %lu more on server", (unsigned long)[serverClippings count]];
 	NSString *other = showsFavorites ? @"history" : @"favorites";
 	statusLabel.stringValue = [NSString stringWithFormat:@"%@     ⏎ paste    ⌘⏎ copy    ⌘⌫ delete    ⇥ %@    esc close", count, other];
 	if ( self.recordingPaused ) {
@@ -368,11 +524,19 @@ static NSString *FoldUndecomposableLetters(NSString *string)
 
 - (void)chooseSelectedAndPaste:(BOOL)paste
 {
-	FlycutClipping *clipping = [[[self selectedClipping] retain] autorelease];
+	NSInteger row = [table selectedRow];
+	if ( row >= 0 && row == [self archiveRow] ) {
+		[self searchArchive];
+		return;
+	}
+	FlycutClipping *clipping = [[[self clippingAtRow:row] retain] autorelease];
+	NSDictionary *event = [[[self archiveEventAtRow:row] retain] autorelease];
 	if ( nil == clipping )
 		return;
 	[self dismiss];
-	if ( paste )
+	if ( event )
+		[self.historyDelegate historyPanel:self chooseArchivedClipping:clipping event:event paste:paste];
+	else if ( paste )
 		[self.historyDelegate historyPanel:self pasteClipping:clipping inFavorites:showsFavorites];
 	else
 		[self.historyDelegate historyPanel:self copyClipping:clipping inFavorites:showsFavorites];
@@ -380,14 +544,20 @@ static NSString *FoldUndecomposableLetters(NSString *string)
 
 - (void)deleteSelected
 {
-	FlycutClipping *clipping = [self selectedClipping];
+	FlycutClipping *clipping = [self selectedLocalClipping];
 	if ( nil != clipping )
 		[self.historyDelegate historyPanel:self deleteClipping:clipping inFavorites:showsFavorites];
 }
 
+- (void)tableClicked:(id)sender
+{
+	if ( [table clickedRow] >= 0 && [table clickedRow] == [self archiveRow] )
+		[self searchArchive];
+}
+
 - (void)tableDoubleClicked:(id)sender
 {
-	if ( [table clickedRow] >= 0 )
+	if ( [table clickedRow] >= 0 && [table clickedRow] != [self archiveRow] )
 		[self chooseSelectedAndPaste:YES];
 }
 
@@ -431,7 +601,7 @@ static NSString *FoldUndecomposableLetters(NSString *string)
 	else if ( command == @selector(moveToBeginningOfDocument:) || command == @selector(scrollToBeginningOfDocument:) )
 		[self selectRow:0];
 	else if ( command == @selector(moveToEndOfDocument:) || command == @selector(scrollToEndOfDocument:) )
-		[self selectRow:[shownClippings count] - 1];
+		[self selectRow:[self rowCount] - 1 towards:-1];
 	else if ( command == @selector(insertNewline:) )
 		[self chooseSelectedAndPaste:YES];
 	else if ( command == @selector(insertTab:) || command == @selector(insertBacktab:) )
@@ -457,7 +627,12 @@ static NSString *FoldUndecomposableLetters(NSString *string)
 
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView
 {
-	return [shownClippings count];
+	return [self rowCount];
+}
+
+- (BOOL)tableView:(NSTableView *)tableView shouldSelectRow:(NSInteger)row
+{
+	return [self isSelectableRow:row];
 }
 
 - (NSTableRowView *)tableView:(NSTableView *)tableView rowViewForRow:(NSInteger)row
@@ -499,12 +674,33 @@ static NSString *FoldUndecomposableLetters(NSString *string)
 	NSTableCellView *cell = [tableView makeViewWithIdentifier:kCellIdentifier owner:self];
 	if ( nil == cell )
 		cell = [[self newCellView] autorelease];
+	NSTextField *subtitle = (NSTextField *)[cell viewWithTag:2];
 
-	FlycutClipping *clipping = [shownClippings objectAtIndex:row];
+	if ( row == [self archiveRow] ) {
+		cell.textField.stringValue = archiveSearched ? @"On server" : archiveSearching ? @"Searching full archive on server…" : @"Search full archive on server…";
+		cell.textField.textColor = archiveSearched ? [NSColor secondaryLabelColor] : [NSColor linkColor];
+		subtitle.stringValue = archiveError ? [@"Failed: " stringByAppendingString:archiveError]
+			: archiveSearched ? ([serverClippings count] ? @"Every machine's history" : @"No other matches on the server")
+			: @"Every machine's history, beyond what this Mac keeps";
+		if ( @available(macOS 11.0, *) )
+			cell.imageView.image = [NSImage imageWithSystemSymbolName:archiveSearched ? @"icloud" : @"magnifyingglass" accessibilityDescription:nil];
+		else
+			cell.imageView.image = [NSImage imageNamed:NSImageNameNetwork];
+		return cell;
+	}
+
+	FlycutClipping *clipping = [self clippingAtRow:row];
+	NSDictionary *event = [self archiveEventAtRow:row];
 	cell.textField.stringValue = [self titleForClipping:clipping];
 	cell.textField.textColor = [[FlycutCredentialDetector sharedDetector] isCredentialClipping:clipping] ? [NSColor systemRedColor]
 		: [clipping contentsDescribeItems] ? [NSColor secondaryLabelColor] : [NSColor labelColor];
-	[(NSTextField *)[cell viewWithTag:2] setStringValue:[self subtitleForClipping:clipping]];
+	NSString *details = [self subtitleForClipping:clipping];
+	if ( event ) {
+		NSString *machine = [[event objectForKey:@"m"] isKindOfClass:[NSString class]] ? [event objectForKey:@"m"] : nil;
+		NSString *origin = machine ? [@"☁︎ on server · " stringByAppendingString:machine] : @"☁︎ on server";
+		details = [details length] ? [NSString stringWithFormat:@"%@ · %@", origin, details] : origin;
+	}
+	subtitle.stringValue = details;
 	cell.imageView.image = [self iconForClipping:clipping];
 	return cell;
 }
@@ -576,6 +772,7 @@ static NSString *FoldUndecomposableLetters(NSString *string)
 	[statusLabel release];
 	[allClippings release];
 	[shownClippings release];
+	[self resetArchive];
 	[iconCache release];
 	[dateFormatter release];
 	[super dealloc];

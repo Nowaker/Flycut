@@ -74,6 +74,17 @@
 -(void)removeUnusedBlobs;
 // The server sync, while history syncs through a server; nil otherwise.
 -(FlycutServerMirror *)serverMirror;
+// Keeps the pasteboard data clippings use under historyBinaryLimitMB (see FlycutBlobStore for which goes).
+// Syncing through a server, clippings keep their items and fetch the data back on demand; otherwise it's gone.
+-(void)enforceBinaryLimit;
+// Some of the clipping's data was dropped here and can be fetched from the server.
+-(BOOL)clippingHasDataOnServer:(FlycutClipping *)clipping;
+-(BOOL)isRestoringDataOfClipping:(FlycutClipping *)clipping;
+// Fetches it back; the completion runs on the main thread whether or not it all came back.
+-(void)restoreDataOfClipping:(FlycutClipping *)clipping completion:(void (^)(void))completion;
+// A clipping from the server's archive (FlycutServerMirror -searchArchive:...) becomes a new copy at the top of
+// history, with its data fetched; the completion gets that top clipping.
+-(void)addArchivedClipping:(FlycutClipping *)clipping fromEvent:(NSDictionary *)event completion:(void (^)(FlycutClipping *added))completion;
 #endif
 -(bool) saveFromStack;
 -(bool)clearItemAtStackPosition;
