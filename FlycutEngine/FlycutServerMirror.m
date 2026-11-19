@@ -51,10 +51,23 @@ static NSString *const kUploadStateName = @".upload-state.json";
 			 (id)kSecAttrAccount: [aServerURL absoluteString] ?: @""};
 }
 
++(NSString *) tokenFilePath
+{
+	NSString *path = [[[NSUserDefaults standardUserDefaults] stringForKey:@"syncServerTokenFile"]
+					  stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+	return [path length] ? [path stringByExpandingTildeInPath] : nil;
+}
+
 +(NSString *) tokenForServerURL:(NSURL *)aServerURL
 {
 	if ( !aServerURL )
 		return nil;
+	NSString *file = [self tokenFilePath];
+	if ( file ) {
+		NSString *contents = [NSString stringWithContentsOfFile:file encoding:NSUTF8StringEncoding error:nil];
+		NSString *value = [contents stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+		return [value length] ? value : nil;
+	}
 	NSMutableDictionary *query = [[[self keychainQueryForServerURL:aServerURL] mutableCopy] autorelease];
 	[query setObject:@YES forKey:(id)kSecReturnData];
 	[query setObject:(id)kSecMatchLimitOne forKey:(id)kSecMatchLimit];

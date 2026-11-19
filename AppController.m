@@ -813,6 +813,14 @@
 
 -(void) showSyncServerToken
 {
+	// A token read from a file is changed in that file, so the field only says where it comes from.
+	NSString *file = [FlycutServerMirror tokenFilePath];
+	[syncServerTokenField setEnabled:nil == file];
+	if ( file ) {
+		[syncServerTokenField setPlaceholderString:[NSString stringWithFormat:@"From %@", [file stringByAbbreviatingWithTildeInPath]]];
+		[syncServerTokenField setStringValue:@""];
+		return;
+	}
 	NSURL *server = [NSURL URLWithString:[[NSUserDefaults standardUserDefaults] stringForKey:@"syncServerURL"] ?: @""];
 	[syncServerTokenField setStringValue:[FlycutServerMirror tokenForServerURL:server] ?: @""];
 }

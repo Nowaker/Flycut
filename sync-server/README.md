@@ -45,6 +45,10 @@ Preferences > History > Sync history through a server:
   `http://` is accepted only when every address the name resolves to is loopback or on the tailnet.
 - Token: the contents of the token file. Flycut stores it in the login keychain itself; enter it here
   rather than adding the item with `security`, which macOS 15 makes Flycut ask the keychain password for.
+  To provision it without the GUI (from a script or over ssh), put it in a file instead and name that file
+  in the `syncServerTokenFile` preference: `defaults write net.nowaker.flycut.claude syncServerTokenFile
+  ~/.config/flycut/sync-token`. The file then wins over the keychain and the token field is disabled.
+  Flycut reads it when sync starts, so quit and reopen Flycut after changing it.
 
 ## Pasteboard data
 

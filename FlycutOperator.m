@@ -413,6 +413,8 @@
 		NSString *scheme = [[server scheme] lowercaseString];
 		if ( !([scheme isEqualToString:@"https"] || [scheme isEqualToString:@"http"]) || [[server host] length] == 0 )
 			problem = @"enter the server's address, starting with https:// (or http:// on your tailnet)";
+		else if ( [token length] == 0 && [FlycutServerMirror tokenFilePath] )
+			problem = [NSString stringWithFormat:@"no token in %@", [[FlycutServerMirror tokenFilePath] stringByAbbreviatingWithTildeInPath]];
 		else if ( [token length] == 0 )
 			problem = @"enter the server's token";
 		else

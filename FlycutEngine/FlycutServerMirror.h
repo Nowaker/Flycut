@@ -60,7 +60,10 @@
 // Where the local copy of a server's logs is kept for this app.
 +(NSString *) localFolderForServerURL:(NSURL *)serverURL;
 
-// The bearer token, kept in the login keychain.
+// The file the syncServerTokenFile preference names, or nil when the token is kept in the keychain.
++(NSString *) tokenFilePath;
+// The bearer token: read from the token file when one is set, so it can be provisioned without the GUI
+// session a keychain write needs, otherwise kept in the login keychain.
 +(NSString *) tokenForServerURL:(NSURL *)serverURL;
 +(void) setToken:(NSString *)token forServerURL:(NSURL *)serverURL;
 

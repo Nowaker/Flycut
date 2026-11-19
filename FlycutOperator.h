@@ -122,7 +122,7 @@
 -(void)applicationWillTerminate;;
 
 // Starts, restarts or stops sharing history as the sync preferences say: through the folder in
-// syncFolderEnabled/syncFolderPath, or through the server in syncServerEnabled/syncServerURL with its keychain token.
+// syncFolderEnabled/syncFolderPath, or through the server in syncServerEnabled/syncServerURL with its token (keychain, or syncServerTokenFile).
 -(void)syncPreferenceDidChange;
 // Same, but starts over even if the folder or server didn't change, as after a new token.
 -(void)restartSync;
